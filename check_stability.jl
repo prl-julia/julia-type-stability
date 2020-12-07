@@ -1,28 +1,37 @@
+# Copute type stability 
+# (instead of printing it, as in @code_arntype@
 # Inspired by julia/stdlib/InteractiveUtils/src/codeview.jl 
+module Stability
 
-f = sin
-t = (Float64,)
+export is_stable_call
 
-# TODO: I get the following error with the current code
-# > ERROR: MethodError: no method matching is_stable_call(::Core.Compiler.Const)
-# Investigate!
+# turn on debug info:
+# julia> ENV["JULIA_DEBUG"] = Main
+# turn off:
+# juila> ENV["JULIA_DEBUG"] = nothing
 
-# cf. warntype_type_printer in the above mentioned file
+# Follows `warntype_type_printer` in the above mentioned file
 is_stable_type(@nospecialize(ty)) = begin
-    ty isa Type &&
-        (!Base.isdispatchelem(ty) || ty == Core.Box) &&
-        !(ty isa Union && Base.is_expected_union(ty))
-
-    # Note 1: isdispatchelem is roughly eqviv. isleaftype (from Julia pre-1.0)
-    # Note 2: Core.Box is a type of a heap-allocated value
+    if ty isa Type && (!Base.isdispatchelem(ty) || ty == Core.Box)
+        if ty isa Union && Base.is_expected_union(ty)
+            true # this is a "mild" problem, so we round up to "stable"
+        else
+            false
+        end
+    else
+        true
+    end
+    # Note 1: Core.Box is a type of a heap-allocated value
+    # Note 2: isdispatchelem is roughly eqviv. to
+    #         isleaftype (from Julia pre-1.0)
     # Note 3: expected union is a trivial union (e.g. 
     #         Union{Int,Missing}; those are deemed "probably
     #         harmless"
 end
 
-is_stable_call(@nospecialize(f), @nospecialize(t)) = begin
-
-    ct = code_typed(f, t)
+#function is_stable_call(@nospecialize(f), @nospecialize(t))
+function is_stable_call(@nospecialize(f), @nospecialize(t))
+    ct = code_typed(f, t, optimize=false)
     ct1 = ct[1] # we ought to have just one method body, I think
     src = ct1[1] # that's code; [2] is return type, I think
 
@@ -35,10 +44,15 @@ is_stable_call(@nospecialize(f), @nospecialize(t)) = begin
     end
 
     result = true
-
+    
+    slotnames = Base.sourceinfo_slotnames(src)
     for i = 1:length(slottypes)
-        result = result && is_stable_call(slottypes[i])
+        stable = is_stable_type(slottypes[i])
+        @debug "is_stable_call slot:" slotnames[i] slottypes[i] stable
+        result = result && stable
     end
     result
 end
+
+end # module
 
