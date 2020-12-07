@@ -1,4 +1,4 @@
-# Copute type stability 
+# Compute type stability 
 # (instead of printing it, as in @code_arntype@
 # Inspired by julia/stdlib/InteractiveUtils/src/codeview.jl 
 module Stability
