@@ -1,0 +1,7 @@
+name = "Stability"
+uuid = "e1676b14-8c06-4561-a70e-1251724d84d9"
+authors = ["Artem Pelenitsyn <a.pelenitsyn@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
