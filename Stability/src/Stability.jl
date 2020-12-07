@@ -29,7 +29,8 @@ is_stable_type(@nospecialize(ty)) = begin
     #         harmless"
 end
 
-#function is_stable_call(@nospecialize(f), @nospecialize(t))
+# f: function name
+# t: tuple of argument types
 function is_stable_call(@nospecialize(f), @nospecialize(t))
     ct = code_typed(f, t, optimize=false)
     ct1 = ct[1] # we ought to have just one method body, I think
