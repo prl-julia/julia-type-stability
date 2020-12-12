@@ -3,7 +3,10 @@
 # Inspired by julia/stdlib/InteractiveUtils/src/codeview.jl 
 module Stability
 
-export is_stable_call
+using Core: MethodInstance
+using MethodAnalysis: visit
+
+export is_stable_call, is_stable_instance, all_mis_of_module
 
 # turn on debug info:
 # julia> ENV["JULIA_DEBUG"] = Main
@@ -53,6 +56,19 @@ function is_stable_call(@nospecialize(f), @nospecialize(t))
         result = result && stable
     end
     result
+end
+
+is_stable_instance(mi :: MethodInstance) =
+    is_stable_call(eval(mi.def.name), mi.specTypes.types[2:end])
+
+all_mis_of_module(modl :: Module) = begin
+    mis = []
+
+    visit(modl) do item
+       isa(item, MethodInstance) && push!(mis, item)
+       true   # walk through everything
+    end
+    mis
 end
 
 end # module
