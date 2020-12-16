@@ -38,7 +38,6 @@ function is_stable_call(@nospecialize(f), @nospecialize(t))
     ct = code_typed(f, t, optimize=false)
     ct1 = ct[1] # we ought to have just one method body, I think
     src = ct1[1] # that's code; [2] is return type, I think
-
     slottypes = src.slottypes
 
     # the following check is taken verbatim from code_warntype
@@ -58,8 +57,12 @@ function is_stable_call(@nospecialize(f), @nospecialize(t))
     result
 end
 
+#
+# MethodInstance-based interface (thanks to MethodAnalysis.jl)
+#
+
 is_stable_instance(mi :: MethodInstance) =
-    is_stable_call(eval(mi.def.name), mi.specTypes.types[2:end])
+    is_stable_call(getfield(mi.def.module, mi.def.name), mi.specTypes.types[2:end])
 
 all_mis_of_module(modl :: Module) = begin
     mis = []
