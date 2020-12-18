@@ -41,3 +41,18 @@ end # Foo
     end
 end
 
+@testset "all_mis_of_module tests " begin
+    using MethodAnalysis: MethodInstance
+    using Main.Foo: bar
+    ## instantiate methods of `bar`:
+    bar(1)
+    bar("abc")
+    mis = all_mis_of_module(Main.Foo)
+    @test length(mis) == 2
+    @test all(mi -> isa(mi, MethodInstance), mis)
+    @test any(mi -> mi.def.name == :bar &&
+      mi.specTypes.types[2:end] == Core.svec(Int), mis)
+    @test any(mi -> mi.def.name == :bar &&
+      mi.specTypes.types[2:end] == Core.svec(String), mis)
+end
+
