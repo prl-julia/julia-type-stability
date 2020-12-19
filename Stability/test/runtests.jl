@@ -56,3 +56,19 @@ end
       mi.specTypes.types[2:end] == Core.svec(String), mis)
 end
 
+module FooBar
+  fbar(::Int) = begin v = 0; v += sin(3.14) end # unstable
+  fbar(::String) = 2
+end # Foo
+
+@testset "module_stats      tests " begin
+    using Main.FooBar: fbar
+    ## instantiate methods of `fbar`:
+    fbar(1)
+    fbar("abc")
+    ms = module_stats(Main.FooBar)
+    @test ms.modl == Main.FooBar
+    fbarstats = ms.stats[:fbar]
+    @test fbarstats.occurs == 2 && fbarstats.stable == 1
+end
+

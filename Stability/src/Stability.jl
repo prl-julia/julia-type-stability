@@ -6,7 +6,8 @@ module Stability
 using Core: MethodInstance
 using MethodAnalysis: visit
 
-export is_stable_call, is_stable_instance, all_mis_of_module
+export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
+       FunctionStats, ModuleStats, module_stats
 
 # turn on debug info:
 # julia> ENV["JULIA_DEBUG"] = Main
@@ -72,6 +73,36 @@ all_mis_of_module(modl :: Module) = begin
        true   # walk through everything
     end
     mis
+end
+
+#
+#  Stats for type stability
+#
+
+# function stats are only mutable during their calculation
+mutable struct FunctionStats
+  occurs :: Int  # how many occurances of the method found (all instances)
+  stable :: Int  # how many stable instances
+end
+
+fstats() = FunctionStats(0,0)
+
+struct ModuleStats
+  modl   :: Module # or Symbol?
+  stats  :: Dict{Symbol, FunctionStats}
+end
+
+ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Symbol, FunctionStats}())
+
+module_stats(modl :: Module) = begin
+    res = ModuleStats(modl)
+    mis = all_mis_of_module(modl)
+    for mi in mis
+        fs = get!(fstats, res.stats, mi.def.name)
+        fs.occurs += 1
+        if is_stable_instance(mi); fs.stable += 1 end
+    end
+    res
 end
 
 end # module
