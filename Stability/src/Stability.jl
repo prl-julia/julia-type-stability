@@ -5,9 +5,11 @@ module Stability
 
 using Core: MethodInstance
 using MethodAnalysis: visit
+using Pkg
 
 export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
-       FunctionStats, ModuleStats, module_stats
+       FunctionStats, ModuleStats, module_stats,
+       package_stats
 
 # turn on debug info:
 # julia> ENV["JULIA_DEBUG"] = Main
@@ -76,7 +78,7 @@ all_mis_of_module(modl :: Module) = begin
 end
 
 #
-#  Stats for type stability
+#  Stats for type stability: Module level
 #
 
 # function stats are only mutable during their calculation
@@ -103,6 +105,33 @@ module_stats(modl :: Module) = begin
         if is_stable_instance(mi); fs.stable += 1 end
     end
     res
+end
+
+#
+#  Stats for type stability: Package level
+#
+
+package_stats(pakg :: String) = begin
+    # prepare a subdir in the current dir to test this particular path
+    # and enter it
+    mkpath(pakg)
+    cd(pakg)
+
+    try
+    # set up and test the package `pakg`
+    Pkg.activate(".")
+    Pkg.add(pakg)
+    Pkg.test(pakg)
+
+    # prepare to run our analysis on the same-named module
+    eval(Meta.parse("using $(pakg)"))
+    m = eval(Symbol(pakg)) # typeof(m) is Module
+
+    catch e
+        println("package_stats($(pakg)) exception:\n$(e)")
+    end
+    
+    error("package_stats: not fully implemented yet")
 end
 
 end # module
