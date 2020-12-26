@@ -11,6 +11,12 @@ export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
        FunctionStats, ModuleStats, module_stats,
        package_stats
 
+# We do nasty things with Pkg.test
+const OVERRIDE_PKG_TEST = true
+if OVERRIDE_PKG_TEST
+  include("pkg-test-override.jl")
+end
+
 # turn on debug info:
 # julia> ENV["JULIA_DEBUG"] = Main
 # turn off:
@@ -113,25 +119,21 @@ end
 
 package_stats(pakg :: String) = begin
     # prepare a subdir in the current dir to test this particular path
-    # and enter it
+    # and enter it? Given that Pkg.test already implements sandboxing...
     mkpath(pakg)
     cd(pakg)
 
     try
-    # set up and test the package `pakg`
-    Pkg.activate(".")
-    Pkg.add(pakg)
-    Pkg.test(pakg)
-
-    # prepare to run our analysis on the same-named module
-    eval(Meta.parse("using $(pakg)"))
-    m = eval(Symbol(pakg)) # typeof(m) is Module
-
+      # set up and test the package `pakg`
+      Pkg.activate(".")
+      Pkg.add(pakg)
+      ENV["STAB_PKG_NAME"] = pakg
+      Pkg.test(pakg)
     catch e
-        println("package_stats($(pakg)) exception:\n$(e)")
+      println("Error when running tests for package $(pakg):\n$(e)")
     end
     
-    error("package_stats: not fully implemented yet")
+    #error("package_stats: not fully implemented yet")
 end
 
 end # module
