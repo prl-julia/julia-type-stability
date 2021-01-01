@@ -125,9 +125,10 @@ end
 #  Stats for type stability: Package level
 #
 
-# package_stats: String -> IO ()
+# package_stats: (pakg: String) -> IO ()
 # Run stability analysis for the package `pakg`.
 # Result is printed on stdout for now (TODO: store as JSON)
+# Assumes: current directory is a project, so Pkg.activate(".") makes sense.
 # Side effects:
 #   Temporary directory with a sandbox for this package is created in the current
 #   directory. This temp directory is not removed upon completeion and can be reused
@@ -139,17 +140,19 @@ package_stats(pakg :: String) = begin
     mkpath(pakg)
     cd(pakg)
 
+    # set up and test the package `pakg`
+    Pkg.activate(".")
+    Pkg.add(pakg)
+    ENV["STAB_PKG_NAME"] = pakg
     try
-      # set up and test the package `pakg`
-      Pkg.activate(".")
-      Pkg.add(pakg)
-      ENV["STAB_PKG_NAME"] = pakg
       Pkg.test(pakg)
     catch e
-      println("Error when running tests for package $(pakg):\n$(e)")
+      println("Error when running tests for package $(pakg)")
+    finally
+      cd(start_dir)
+      Pkg.activate(".")
     end
 
-    cd(start_dir)
     
     #error("package_stats: not fully implemented yet")
 end
