@@ -70,8 +70,16 @@ end
 # MethodInstance-based interface (thanks to MethodAnalysis.jl)
 #
 
-is_stable_instance(mi :: MethodInstance) =
-    is_stable_call(getfield(mi.def.module, mi.def.name), mi.specTypes.types[2:end])
+is_stable_instance(mi :: MethodInstance) = begin
+    try
+        res = is_stable_call(
+          getfield(mi.def.module, mi.def.name),
+          mi.specTypes.types[2:end])
+    catch e
+        println("is_stable_instance error for $(mi):")
+        throw(e)
+    end
+end
 
 all_mis_of_module(modl :: Module) = begin
     mis = []
@@ -93,7 +101,7 @@ mutable struct FunctionStats
   stable :: Int  # how many stable instances
 end
 
-fstats() = FunctionStats(0,0)
+fstats_default() = FunctionStats(0,0)
 
 struct ModuleStats
   modl   :: Module # or Symbol?
@@ -106,7 +114,7 @@ module_stats(modl :: Module) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     for mi in mis
-        fs = get!(fstats, res.stats, mi.def.name)
+        fs = get!(fstats_default, res.stats, mi.def.name)
         fs.occurs += 1
         if is_stable_instance(mi); fs.stable += 1 end
     end
@@ -117,9 +125,17 @@ end
 #  Stats for type stability: Package level
 #
 
+# package_stats: String -> IO ()
+# Run stability analysis for the package `pakg`.
+# Result is printed on stdout for now (TODO: store as JSON)
+# Side effects:
+#   Temporary directory with a sandbox for this package is created in the current
+#   directory. This temp directory is not removed upon completeion and can be reused
+#   in the future runs. This reuse shouldn't harm anyone (in theory).
 package_stats(pakg :: String) = begin
     # prepare a subdir in the current dir to test this particular path
     # and enter it? Given that Pkg.test already implements sandboxing...
+    start_dir=pwd()
     mkpath(pakg)
     cd(pakg)
 
@@ -132,6 +148,8 @@ package_stats(pakg :: String) = begin
     catch e
       println("Error when running tests for package $(pakg):\n$(e)")
     end
+
+    cd(start_dir)
     
     #error("package_stats: not fully implemented yet")
 end
