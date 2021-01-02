@@ -8,12 +8,11 @@ using MethodAnalysis: visit
 using Pkg
 
 export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
-       FunctionStats, ModuleStats, module_stats,
+       FunctionStats, ModuleStats, module_stats, modstats_summary,
        package_stats
 
 # We do nasty things with Pkg.test
-const OVERRIDE_PKG_TEST = true
-if OVERRIDE_PKG_TEST
+if get(ENV, "DEV", "NO") != "NO"
   include("pkg-test-override.jl")
 end
 
@@ -70,15 +69,24 @@ end
 # MethodInstance-based interface (thanks to MethodAnalysis.jl)
 #
 
+# Note [Generic Method Instances]
+# We don't know yet what to do with generic method instances (cf. issue #2)
+# So we detect them, count, but don't test for stability.
+
+is_generic_instance(mi :: MethodInstance) = typeof(mi.specTypes) == UnionAll
+
+# Note [Unknown instances]
+# Some instances we just can't resolve -- for unknown reasons.
+# E.g. In JSON test suite there's a `lower` method that is unknown.
+
+is_known_instance(mi :: MethodInstance) = isdefined(mi.def.module, mi.def.name)
+
+# Result: test if `mi` is stable
+# Pre-condition: `mi` is not generic.
 is_stable_instance(mi :: MethodInstance) = begin
-    try
-        res = is_stable_call(
-          getfield(mi.def.module, mi.def.name),
-          mi.specTypes.types[2:end])
-    catch e
-        println("is_stable_instance error for $(mi):")
-        throw(e)
-    end
+    res = is_stable_call(
+      getfield(mi.def.module, mi.def.name),
+      mi.specTypes.types[2:end])
 end
 
 all_mis_of_module(modl :: Module) = begin
@@ -97,11 +105,22 @@ end
 
 # function stats are only mutable during their calculation
 mutable struct FunctionStats
-  occurs :: Int  # how many occurances of the method found (all instances)
-  stable :: Int  # how many stable instances
+  occurs  :: Int  # how many occurances of the method found (all instances)
+  stable  :: Int  # how many stable instances
+  generic :: Int  # how many generic instances (we don't know how to handle them yet)
+  undef   :: Int  # how many methods could not get resolved (for unknown reason)
+  unstable:: Int  # how many unstable instances (just so that all-but-occurs sums up to occurs)
 end
 
-fstats_default() = FunctionStats(0,0)
+fstats_default() = FunctionStats(0,0,0,0,0)
+import Base.(+)
+(+)(fs1 :: FunctionStats, fs2 :: FunctionStats) =
+  FunctionStats(
+    fs1.occurs+fs2.occurs,
+    fs1.stable+fs2.stable,
+    fs1.generic+fs2.generic,
+    fs1.undef+fs2.undef,
+    fs1.unstable+fs2.unstable)
 
 struct ModuleStats
   modl   :: Module # or Symbol?
@@ -114,12 +133,22 @@ module_stats(modl :: Module) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     for mi in mis
+        @info "Process $(mi)"
+        if mi.def.name == :lower
+          @show mi.def.module
+        end
         fs = get!(fstats_default, res.stats, mi.def.name)
         fs.occurs += 1
-        if is_stable_instance(mi); fs.stable += 1 end
+        if     is_generic_instance(mi); fs.generic += 1
+        elseif !is_known_instance(mi);  fs.undef   += 1
+        elseif is_stable_instance(mi);  fs.stable  += 1
+        else                            fs.unstable+= 1 end
     end
     res
 end
+
+modstats_summary(ms :: ModuleStats) =
+  foldl((+), values(ms.stats); init=fstats_default())
 
 #
 #  Stats for type stability: Package level
@@ -131,7 +160,7 @@ end
 # Assumes: current directory is a project, so Pkg.activate(".") makes sense.
 # Side effects:
 #   Temporary directory with a sandbox for this package is created in the current
-#   directory. This temp directory is not removed upon completeion and can be reused
+#   directory. This temp directory is not removed upon completion and can be reused
 #   in the future runs. This reuse shouldn't harm anyone (in theory).
 package_stats(pakg :: String) = begin
     # prepare a subdir in the current dir to test this particular path
@@ -153,8 +182,6 @@ package_stats(pakg :: String) = begin
       Pkg.activate(".")
     end
 
-    
-    #error("package_stats: not fully implemented yet")
 end
 
 end # module

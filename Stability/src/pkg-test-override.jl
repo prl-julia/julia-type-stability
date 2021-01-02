@@ -1,6 +1,8 @@
 using Pkg
 
 # Overrides the function that is called before the running of package tests
+# History: the idea of this hack is taken from
+# https://github.com/julbinb/juliette-wa/blob/9f6d4f24f31cb7e59b3928f1cc40c8380d8d3c40/src/analysis/dynamic-analysis/override-core/test-override.jl
 function Pkg.Operations.gen_test_code(testfile::String;
         coverage=false,
         julia_args::Cmd=``,
@@ -18,7 +20,7 @@ function Pkg.Operations.gen_test_code(testfile::String;
                                                   # running stability analysis
         pakg=ENV["STAB_PKG_NAME"]
         m = eval(Symbol(pakg)) # typeof(m) is Module
-        print(module_stats(m)) # TODO: replace with storing as JSON under ENV["STAB_OUT"]
+        println(modstats_summary(module_stats(m))) # TODO: replace with storing as JSON under ENV["STAB_OUT"]
         """
     @debug code
     return ```
