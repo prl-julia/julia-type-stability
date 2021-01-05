@@ -9,7 +9,8 @@ using Pkg
 
 export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
        FunctionStats, ModuleStats, module_stats, modstats_summary,
-       package_stats
+       package_stats,
+       show_comma_sep
 
 # We do nasty things with Pkg.test
 if get(ENV, "DEV", "NO") != "NO"
@@ -122,6 +123,9 @@ import Base.(+)
     fs1.undef+fs2.undef,
     fs1.unstable+fs2.unstable)
 
+show_comma_sep(fs::FunctionStats) =
+    "$(fs.occurs),$(fs.stable),$(fs.generic),$(fs.undef)" # Note: we don't print unstable
+
 struct ModuleStats
   modl   :: Module # or Symbol?
   stats  :: Dict{Symbol, FunctionStats}
@@ -133,10 +137,6 @@ module_stats(modl :: Module) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     for mi in mis
-        @info "Process $(mi)"
-        if mi.def.name == :lower
-          @show mi.def.module
-        end
         fs = get!(fstats_default, res.stats, mi.def.name)
         fs.occurs += 1
         if     is_generic_instance(mi); fs.generic += 1
@@ -168,11 +168,13 @@ package_stats(pakg :: String) = begin
     start_dir=pwd()
     mkpath(pakg)
     cd(pakg)
+    work_dir = pwd()
 
     # set up and test the package `pakg`
     Pkg.activate(".")
     Pkg.add(pakg)
     ENV["STAB_PKG_NAME"] = pakg
+    ENV["WORK_DIR"] = work_dir
     try
       Pkg.test(pakg)
     catch e

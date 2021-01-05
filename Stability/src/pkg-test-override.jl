@@ -19,8 +19,11 @@ function Pkg.Operations.gen_test_code(testfile::String;
         include($(repr(testfile)))
                                                   # running stability analysis
         pakg=ENV["STAB_PKG_NAME"]
+        wdir=ENV["WORK_DIR"]
         m = eval(Symbol(pakg)) # typeof(m) is Module
-        println(modstats_summary(module_stats(m))) # TODO: replace with storing as JSON under ENV["STAB_OUT"]
+        s = modstats_summary(module_stats(m))
+        #println(s)
+        open(f -> println(f, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
         """
     @debug code
     return ```
