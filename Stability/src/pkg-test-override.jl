@@ -11,19 +11,28 @@ function Pkg.Operations.gen_test_code(testfile::String;
         push!(LOAD_PATH, "@")
         push!(LOAD_PATH, "@v#.#")
         push!(LOAD_PATH, "@stdlib")
-        push!(LOAD_PATH, "$(dirname(@__DIR__))")  # add Stability.jl to LOAD_PATH
+        push!(LOAD_PATH, dirname("$(@__DIR__)"))       # add Stability.jl to LOAD_PATH
         $(Base.load_path_setup_code(false))
         cd($(repr(dirname(testfile))))
         append!(empty!(ARGS), $(repr(test_args.exec)))
         using Stability                           # using Stability
-        include($(repr(testfile)))
-                                                  # running stability analysis
+        try
+          @info "[Stability] Hooks are on. About to start testing."
+          include($(repr(testfile)))
+          @info "[Stability] Testing is finished successfully"
+          @info "[Stability] About to start analysis"
+        catch error
+          println("Warning: Error when running tests for package " * pakg)
+        end
+                                                  # running stability analysis:
         pakg=ENV["STAB_PKG_NAME"]
         wdir=ENV["WORK_DIR"]
         m = eval(Symbol(pakg)) # typeof(m) is Module
         s = modstats_summary(module_stats(m))
         #println(s)
+        @info "[Stability] About to store results in a file"
         open(f -> println(f, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
+        @info "[Stability] Finish"
         """
     @debug code
     return ```

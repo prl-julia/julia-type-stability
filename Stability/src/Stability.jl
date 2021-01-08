@@ -9,7 +9,7 @@ using Pkg
 
 export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
        FunctionStats, ModuleStats, module_stats, modstats_summary,
-       package_stats,
+       package_stats, loop_pkgs_stats,
        show_comma_sep
 
 # We do nasty things with Pkg.test
@@ -169,21 +169,30 @@ package_stats(pakg :: String) = begin
     mkpath(pakg)
     cd(pakg)
     work_dir = pwd()
-
-    # set up and test the package `pakg`
-    Pkg.activate(".")
-    Pkg.add(pakg)
     ENV["STAB_PKG_NAME"] = pakg
     ENV["WORK_DIR"] = work_dir
+
+    # set up and test the package `pakg`
     try
-      Pkg.test(pakg)
+        Pkg.activate(".")
+        Pkg.add(pakg)
+        Pkg.test(pakg)
     catch e
-      println("Error when running tests for package $(pakg)")
+        println("Error when running tests for package $(pakg)")
     finally
-      cd(start_dir)
-      Pkg.activate(".")
+        cd(start_dir)
+        # TODO: |--- it's hard to figure what's right path to activate here
+        #       v    we go with Stability.jl's root
+        Pkg.activate(dirname(@__DIR__))
     end
 
+end
+
+loop_pkgs_stats(pksg_list_filename::String) = begin
+    pkgs = readlines(pksg_list_filename)
+    for p in pkgs
+        package_stats(p)
+    end
 end
 
 end # module
