@@ -17,6 +17,12 @@ if get(ENV, "DEV", "NO") != "NO"
   include("pkg-test-override.jl")
 end
 
+# Wheather we do parallel processing of packages
+PAR = get(ENV, "PAR", "NO") != "NO"
+if PAR
+    using Distributed
+end
+
 # turn on debug info:
 # julia> ENV["JULIA_DEBUG"] = Main
 # turn off:
@@ -153,7 +159,7 @@ module_stats(modl :: Module) = begin
             catch err
                 @debug "is_stable_instance failed: $(err)"
                 fs.fail += 1
-                return
+                continue
             end
             if is_st
                 fs.stable   += 1
@@ -208,8 +214,12 @@ end
 
 loop_pkgs_stats(pksg_list_filename::String) = begin
     pkgs = readlines(pksg_list_filename)
-    for p in pkgs
-        package_stats(p)
+    if PAR
+        pmap(package_stats, pkgs)
+    else
+        for p in pkgs
+            package_stats(p)
+        end
     end
 end
 
