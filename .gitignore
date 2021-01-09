@@ -1,1 +1,2 @@
-Stability/pkgs
+Stability/pkgs/*
+!Stability/pkgs/top-10.txt

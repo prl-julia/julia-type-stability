@@ -110,10 +110,11 @@ mutable struct FunctionStats
   stable  :: Int  # how many stable instances
   generic :: Int  # how many generic instances (we don't know how to handle them yet)
   undef   :: Int  # how many methods could not get resolved (for unknown reason)
+  fail    :: Int  # how many times fail to detect stability due to @code_typed (cf. Issues #7, #8)
   unstable:: Int  # how many unstable instances (just so that all-but-occurs sums up to occurs)
 end
 
-fstats_default() = FunctionStats(0,0,0,0,0)
+fstats_default() = FunctionStats(0,0,0,0,0,0)
 import Base.(+)
 (+)(fs1 :: FunctionStats, fs2 :: FunctionStats) =
   FunctionStats(
@@ -121,10 +122,11 @@ import Base.(+)
     fs1.stable+fs2.stable,
     fs1.generic+fs2.generic,
     fs1.undef+fs2.undef,
+    fs1.fail+fs2.fail,
     fs1.unstable+fs2.unstable)
 
 show_comma_sep(fs::FunctionStats) =
-    "$(fs.occurs),$(fs.stable),$(fs.generic),$(fs.undef)" # Note: we don't print unstable
+    "$(fs.occurs),$(fs.stable),$(fs.generic),$(fs.undef),$(fs.fail)" # Note: we don't print unstable
 
 struct ModuleStats
   modl   :: Module # or Symbol?
@@ -139,10 +141,26 @@ module_stats(modl :: Module) = begin
     for mi in mis
         fs = get!(fstats_default, res.stats, mi.def.name)
         fs.occurs += 1
+
+        # Simple problematic cases first (Issues #2, #6)
         if     is_generic_instance(mi); fs.generic += 1
         elseif !is_known_instance(mi);  fs.undef   += 1
-        elseif is_stable_instance(mi);  fs.stable  += 1
-        else                            fs.unstable+= 1 end
+        else
+            # Sometimes `@code_typed` (the heart of `is_stable_call`) fails in some way (cf. Issues #7, #8)
+            is_st = false
+            try
+                is_st = is_stable_instance(mi);
+            catch err
+                @debug "is_stable_instance failed: $(err)"
+                fs.fail += 1
+                return
+            end
+            if is_st
+                fs.stable   += 1
+            else
+                fs.unstable += 1
+            end
+        end
     end
     res
 end

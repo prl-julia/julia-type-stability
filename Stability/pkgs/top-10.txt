@@ -1,0 +1,10 @@
+Flux
+Pluto
+IJulia
+Gadfly
+DifferentialEquations
+Gen
+JuMP
+Knet
+Plots
+Genie
