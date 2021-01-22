@@ -1,0 +1,12 @@
+package,instances,stable,fail
+IJulia,142,93,0
+Gen,1970,1239,2
+Knet,12596,3208,209
+DifferentialEquations,8235,4228,185
+Gadfly,43608,31925,84
+JSON,667,515,0,0,0
+JuMP,32487,21012,126
+Pluto,88929,60254,1032
+Flux,4525,3478,0
+Plots,5823,3635,37
+Genie,2019,1652,39

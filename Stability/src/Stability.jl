@@ -47,7 +47,7 @@ is_stable_type(@nospecialize(ty)) = begin
     #         harmless"
 end
 
-# f: function name
+# f: function
 # t: tuple of argument types
 function is_stable_call(@nospecialize(f), @nospecialize(t))
     ct = code_typed(f, t, optimize=false)
@@ -77,8 +77,10 @@ end
 #
 
 # Note [Generic Method Instances]
-# We don't know yet what to do with generic method instances (cf. issue #2)
-# So we detect them, count, but don't test for stability.
+# We don't quite understand hwo to process generic method instances (cf. issue #2)
+# We used to detect them, count, but don't test for stability.
+# Currently, we use Base.unwrap_unionall and the test just works (yes, for types
+# with free type variables). This still requires more thinking.
 
 is_generic_instance(mi :: MethodInstance) = typeof(mi.specTypes) == UnionAll
 
@@ -91,9 +93,15 @@ is_known_instance(mi :: MethodInstance) = isdefined(mi.def.module, mi.def.name)
 # Result: test if `mi` is stable
 # Pre-condition: `mi` is not generic.
 is_stable_instance(mi :: MethodInstance) = begin
-    res = is_stable_call(
-      getfield(mi.def.module, mi.def.name),
-      mi.specTypes.types[2:end])
+    sig = Base.unwrap_unionall(mi.specTypes).types
+    func = if sig[1] <: Function
+        sig[1].instance
+    else # it's a constructor (I hope), and the parent module is the place
+        getfield( # to search for the function
+            parentmodule(sig[1].parameters[1]),
+            mi.def.name)
+    end
+    res = is_stable_call(func, sig[2:end])
 end
 
 all_mis_of_module(modl :: Module) = begin
@@ -132,7 +140,9 @@ import Base.(+)
     fs1.unstable+fs2.unstable)
 
 show_comma_sep(fs::FunctionStats) =
-    "$(fs.occurs),$(fs.stable),$(fs.generic),$(fs.undef),$(fs.fail)" # Note: we don't print unstable
+    "$(fs.occurs),$(fs.stable),$(fs.fail)"
+    # Note 1: we don't print unstable
+    # Note 2: $(fs.generic),$(fs.undef), are currently not needed
 
 struct ModuleStats
   modl   :: Module # or Symbol?
@@ -147,25 +157,18 @@ module_stats(modl :: Module) = begin
     for mi in mis
         fs = get!(fstats_default, res.stats, mi.def.name)
         fs.occurs += 1
-
-        # Simple problematic cases first (Issues #2, #6)
-        if     is_generic_instance(mi); fs.generic += 1
-        elseif !is_known_instance(mi);  fs.undef   += 1
+        is_st = false
+        try
+            is_st = is_stable_instance(mi);
+        catch err
+            #@info "is_stable_instance failed: $(err)"
+            fs.fail += 1
+            continue
+        end
+        if is_st
+            fs.stable   += 1
         else
-            # Sometimes `@code_typed` (the heart of `is_stable_call`) fails in some way (cf. Issues #7, #8)
-            is_st = false
-            try
-                is_st = is_stable_instance(mi);
-            catch err
-                @debug "is_stable_instance failed: $(err)"
-                fs.fail += 1
-                continue
-            end
-            if is_st
-                fs.stable   += 1
-            else
-                fs.unstable += 1
-            end
+            fs.unstable += 1
         end
     end
     res
