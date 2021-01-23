@@ -19,7 +19,7 @@ function Pkg.Operations.gen_test_code(testfile::String;
         pakg=ENV["STAB_PKG_NAME"]
         wdir=ENV["WORK_DIR"]
         try
-          @info "[Stability] Hooks are on. About to start testing."
+          @info "[Stability] Hooks are on. About to start testing " * pakg * "."
           include($(repr(testfile)))
           @info "[Stability] Testing is finished successfully"
           @info "[Stability] About to start analysis"

@@ -94,16 +94,24 @@ is_known_instance(mi :: MethodInstance) = isdefined(mi.def.module, mi.def.name)
 # Pre-condition: `mi` is not generic.
 is_stable_instance(mi :: MethodInstance) = begin
     sig = Base.unwrap_unionall(mi.specTypes).types
-    func = if sig[1] <: Function
-        sig[1].instance
-    else # it's a constructor (I hope), and the parent module is the place
-        getfield( # to search for the function
-            parentmodule(sig[1].parameters[1]),
-            mi.def.name)
-    end
+    func = func_by_type(sig[1])
     res = is_stable_call(func, sig[2:end])
 end
 
+# Get the Function object given its type (`typeof(f)` for regular functions and
+# `Type{T}` for constructors)
+func_by_type(funcType :: Type{T} where T <: Function) =
+    funcType.instance      # regular function
+
+func_by_type(funcType :: Type{T} where T <: Type) =
+    funcType.parameters[1] # constructor
+
+func_by_type(funcType)         = throw("func_by_type: Unknown function type")
+
+# Result: all (compiled) method instances of the given module
+# Note: This seems to recourse into things like X.Y (submodules) if modl=X.
+# But it seem to bring even more, so I'm not positive how
+# MethodAnalysis.visit works.
 all_mis_of_module(modl :: Module) = begin
     mis = []
 
