@@ -105,34 +105,19 @@ end
 
 # Result: test if `mi` is stable
 # Pre-condition: `mi` is not generic.
-is_stable_instance(mi :: MethodInstance) = begin
+reconstruct_func_call(mi :: MethodInstance) = begin
     sig = Base.unwrap_unionall(mi.specTypes).types
-    func = func_by_type(sig[1])
-    try
-        res = is_stable_call(func, sig[2:end])
-    catch err
-        throw(StabilityError(mi.def, sig))
+    if is_func_type(sig[1])
+        (sig[1].instance, sig[2:end])
+    else
+        nothing
     end
 end
 
 # Get the Function object given its type (`typeof(f)` for regular functions and
 # `Type{T}` for constructors)
-func_by_type(funcType :: Type{T} where T <: Function) =
-    funcType.instance      # regular function
-
-func_by_type(funcType :: Type{T} where T <: Type) = begin
-    try
-      Base.unwrap_unionall(funcType).parameters[1] # constructor
-    catch err
-        println("ERROR: func_by_type($(funcType))")
-        showerror(err, stacktrace(catch_backtrace()))
-        println()
-        throw(err)
-    end
-end
-
-# Note: this shouldn't and doesn't happen in practise
-func_by_type(::Any) = throw("func_by_type: Unknown function type")
+is_func_type(funcType :: Type{T} where T <: Function) = true
+is_func_type(::Any) = false
 
 # Result: all (compiled) method instances of the given module
 # Note: This seems to recourse into things like X.Y (submodules) if modl=X.
@@ -190,22 +175,24 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
     mis = all_mis_of_module(modl)
     for mi in mis
         fs = get!(fstats_default, res.stats, mi.def.name)
-        fs.occurs += 1
-        is_st = false
         try
-            is_st = is_stable_instance(mi);
+            call = reconstruct_func_call(mi)
+            if call === nothing # this mi is a constructor call
+                continue
+            end
+            fs.occurs += 1
+            is_st = is_stable_call(call...);
+            if is_st
+                fs.stable   += 1
+            else
+                fs.unstable += 1
+            end
         catch err
-            #@info "is_stable_instance failed: $(err)"
             fs.fail += 1
             print(errio, "ERROR: ");
             showerror(errio, err, stacktrace(catch_backtrace()))
             println(errio)
             continue
-        end
-        if is_st
-            fs.stable   += 1
-        else
-            fs.unstable += 1
         end
     end
     res
