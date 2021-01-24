@@ -47,10 +47,18 @@ is_stable_type(@nospecialize(ty)) = begin
     #         harmless"
 end
 
+struct TypeInferenceError <: Exception
+    f :: Any
+    t :: Any
+end
+
 # f: function
 # t: tuple of argument types
 function is_stable_call(@nospecialize(f), @nospecialize(t))
     ct = code_typed(f, t, optimize=false)
+    if length(ct) == 0
+        throw(TypeInferenceError(f,t)) # type inference failed
+    end
     ct1 = ct[1] # we ought to have just one method body, I think
     src = ct1[1] # that's code; [2] is return type, I think
     slottypes = src.slottypes
@@ -90,12 +98,21 @@ is_generic_instance(mi :: MethodInstance) = typeof(mi.specTypes) == UnionAll
 
 is_known_instance(mi :: MethodInstance) = isdefined(mi.def.module, mi.def.name)
 
+struct StabilityError <: Exception
+    met :: Method
+    sig :: Any
+end
+
 # Result: test if `mi` is stable
 # Pre-condition: `mi` is not generic.
 is_stable_instance(mi :: MethodInstance) = begin
     sig = Base.unwrap_unionall(mi.specTypes).types
     func = func_by_type(sig[1])
-    res = is_stable_call(func, sig[2:end])
+    try
+        res = is_stable_call(func, sig[2:end])
+    catch err
+        throw(StabilityError(mi.def, sig))
+    end
 end
 
 # Get the Function object given its type (`typeof(f)` for regular functions and
@@ -103,10 +120,19 @@ end
 func_by_type(funcType :: Type{T} where T <: Function) =
     funcType.instance      # regular function
 
-func_by_type(funcType :: Type{T} where T <: Type) =
-    funcType.parameters[1] # constructor
+func_by_type(funcType :: Type{T} where T <: Type) = begin
+    try
+      Base.unwrap_unionall(funcType).parameters[1] # constructor
+    catch err
+        println("ERROR: func_by_type($(funcType))")
+        showerror(err, stacktrace(catch_backtrace()))
+        println()
+        throw(err)
+    end
+end
 
-func_by_type(funcType)         = throw("func_by_type: Unknown function type")
+# Note: this shouldn't and doesn't happen in practise
+func_by_type(::Any) = throw("func_by_type: Unknown function type")
 
 # Result: all (compiled) method instances of the given module
 # Note: This seems to recourse into things like X.Y (submodules) if modl=X.
@@ -159,7 +185,7 @@ end
 
 ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Symbol, FunctionStats}())
 
-module_stats(modl :: Module) = begin
+module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     for mi in mis
@@ -171,6 +197,9 @@ module_stats(modl :: Module) = begin
         catch err
             #@info "is_stable_instance failed: $(err)"
             fs.fail += 1
+            print(errio, "ERROR: ");
+            showerror(errio, err, stacktrace(catch_backtrace()))
+            println(errio)
             continue
         end
         if is_st

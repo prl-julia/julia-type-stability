@@ -19,20 +19,20 @@ function Pkg.Operations.gen_test_code(testfile::String;
         pakg=ENV["STAB_PKG_NAME"]
         wdir=ENV["WORK_DIR"]
         try
-          @info "[Stability] Hooks are on. About to start testing " * pakg * "."
+          @info "[Stability] [Package: " * pakg * "] Hooks are on. About to start testing."
           include($(repr(testfile)))
-          @info "[Stability] Testing is finished successfully"
-          @info "[Stability] About to start analysis"
+          @info "[Stability] [Package: " * pakg * "] Testing is finished successfully. About to start analysis"
         catch error
           println("Warning: Error when running tests for package " * pakg)
         end
                                                   # running stability analysis:
         m = eval(Symbol(pakg)) # typeof(m) is Module
-        s = modstats_summary(module_stats(m))
-        #println(s)
-        @info "[Stability] About to store results in a file"
-        open(f -> println(f, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
-        @info "[Stability] Finish"
+        open(joinpath(wdir, "stability-errors.out"), "w") do err
+          s = modstats_summary(module_stats(m, err))
+          @info "[Stability] [Package: " * pakg * "] About to store results in a file"
+          open(out -> println(out, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
+        end
+        @info "[Stability] [Package: " * pakg * "] Finish"
         """
     @debug code
     return ```
