@@ -103,8 +103,8 @@ struct StabilityError <: Exception
     sig :: Any
 end
 
-# Result: test if `mi` is stable
-# Pre-condition: `mi` is not generic.
+# Result: pair of the function object and the tuple of types of arguments
+#         or nothing if it's constructor call.
 reconstruct_func_call(mi :: MethodInstance) = begin
     sig = Base.unwrap_unionall(mi.specTypes).types
     if is_func_type(sig[1])
@@ -141,30 +141,22 @@ end
 mutable struct FunctionStats
   occurs  :: Int  # how many occurances of the method found (all instances)
   stable  :: Int  # how many stable instances
-  generic :: Int  # how many generic instances (we don't know how to handle them yet)
-  undef   :: Int  # how many methods could not get resolved (for unknown reason)
   fail    :: Int  # how many times fail to detect stability due to @code_typed (cf. Issues #7, #8)
-  unstable:: Int  # how many unstable instances (just so that all-but-occurs sums up to occurs)
 end
 
-fstats_default() = FunctionStats(0,0,0,0,0,0)
+fstats_default() = FunctionStats(0,0,0)
 import Base.(+)
 (+)(fs1 :: FunctionStats, fs2 :: FunctionStats) =
   FunctionStats(
     fs1.occurs+fs2.occurs,
     fs1.stable+fs2.stable,
-    fs1.generic+fs2.generic,
-    fs1.undef+fs2.undef,
-    fs1.fail+fs2.fail,
-    fs1.unstable+fs2.unstable)
+    fs1.fail+fs2.fail)
 
 show_comma_sep(fs::FunctionStats) =
     "$(fs.occurs),$(fs.stable),$(fs.fail)"
-    # Note 1: we don't print unstable
-    # Note 2: $(fs.generic),$(fs.undef), are currently not needed
 
 struct ModuleStats
-  modl   :: Module # or Symbol?
+  modl   :: Module
   stats  :: Dict{Symbol, FunctionStats}
 end
 
@@ -177,7 +169,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
         fs = get!(fstats_default, res.stats, mi.def.name)
         try
             call = reconstruct_func_call(mi)
-            if call === nothing # this mi is a constructor call
+            if call === nothing # this mi is a constructor call - skip
                 continue
             end
             fs.occurs += 1
