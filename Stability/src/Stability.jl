@@ -8,7 +8,7 @@ using MethodAnalysis: visit
 using Pkg
 
 export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
-       FunctionStats, ModuleStats, module_stats, modstats_summary,
+       FunctionStats, ModuleStats, module_stats, modstats_summary, modstats_table,
        package_stats, loop_pkgs_stats,
        show_comma_sep
 
@@ -157,16 +157,16 @@ show_comma_sep(fs::FunctionStats) =
 
 struct ModuleStats
   modl   :: Module
-  stats  :: Dict{Symbol, FunctionStats}
+  stats  :: Dict{Method, FunctionStats}
 end
 
-ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Symbol, FunctionStats}())
+ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, FunctionStats}())
 
 module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     for mi in mis
-        fs = get!(fstats_default, res.stats, mi.def.name)
+        fs = get!(fstats_default, res.stats, mi.def)
         try
             call = reconstruct_func_call(mi)
             if call === nothing # this mi is a constructor call - skip
@@ -192,6 +192,28 @@ end
 
 modstats_summary(ms :: ModuleStats) =
   foldl((+), values(ms.stats); init=fstats_default())
+
+struct ModuleStatsRecord
+    modl :: String
+    funcname :: String
+    occurs :: Int
+    stable :: Float64
+    size :: Int
+    file :: String
+    line :: Int
+end
+
+modstats_table(ms :: ModuleStats) :: Vector{ModuleStatsRecord} = begin
+    modl = "$(ms.modl)"
+    res = []
+    for (meth,fstats) in ms.stats
+        push!(res,
+              ModuleStatsRecord(
+                  modl, "$(meth.name)", fstats.occurs, fstats.stable/fstats.occurs,
+                  length(meth.source), "$(meth.file)", meth.line))
+    end
+    res
+end
 
 #
 #  Stats for type stability: Package level

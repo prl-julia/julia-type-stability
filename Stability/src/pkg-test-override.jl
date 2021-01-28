@@ -27,10 +27,15 @@ function Pkg.Operations.gen_test_code(testfile::String;
         end
                                                   # running stability analysis:
         m = eval(Symbol(pakg)) # typeof(m) is Module
+        using Pkg
+        Pkg.add("CSV")
+        using CSV
         open(joinpath(wdir, "stability-errors.out"), "w") do err
-          s = modstats_summary(module_stats(m, err))
+          ms = module_stats(m, err)
+          s = modstats_summary(ms)
           @info "[Stability] [Package: " * pakg * "] About to store results in a file"
           open(out -> println(out, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
+          CSV.write(joinpath(wdir, "stability-stats.csv"), modstats_table(ms))
         end
         @info "[Stability] [Package: " * pakg * "] Finish"
         """
