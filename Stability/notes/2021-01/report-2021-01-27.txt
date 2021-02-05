@@ -1,3 +1,5 @@
+## 2021-01-27
+
 1. Revising failures in the pipeline (including after some talk with Tim Holy over on Discourse).
    Result: I discard constructors now. This makes numbers way cleaner (i.e. less failures).
    A small number of type inference failures remains, mostly form @generated functions.
@@ -19,25 +21,23 @@
 
    What remains to be worked out is how exactly "dynamic dispatch" and "static calls" look in the language.
 
-# Notes form 1t1 with Jan
+### Notes form one-to-one with Jan
 
-look up how they (Julia) define type stability:
+Look up how they (Julia) define type stability:
 - in the docs
 - in the impl
 
-do abstract hurt stability as much as unions?
+Do abstract hurt stability as much as unions?
 
-# Notes from Juliette meeting
+### Notes from Juliette meeting
 
-Ben: which kind of types cause unstability?
-
-frequency of stable? run-time times? real apps?
-
-Julia: how many instable slots are there?
-
-Jan: get an idea about the number of methods, not instances
-
-Jan: surface lang:
-- every var is any
-- every call is dispatch
-- no ANF [Ben: having ANF there is easier; Jan: agreed]
+* Ben: which kind of types cause unstability?
+* Ross: is it possible to record the frequency of stable calls? e.g. attach counters manually.
+* Ben: Maybe running times would be more useful? "real" apps?
+* Julia: how many instable slots are there?
+* Jan: get an idea about the number of methods defined, not the number of instances compiled.
+* Jan on formalism: surface language:
+  - every var is any
+  - every call is dispatch
+  - no ANF [Ben: having ANF there is easier; Jan: agreed]
+  
