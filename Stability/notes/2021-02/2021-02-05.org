@@ -1,0 +1,26 @@
+* Many small TODOs from past meetings
+** Empirical Study
+*** How to measure timing impact of unstable functions?
+**** Attach counters recording number of calls?
+**** Use profiler?
+*** Do we want to make sure no standard functions get into the stats? Probably
+*** Probable bugs
+**** 0s in the current tables: constructors are not filtered early enough?
+**** Sometimes stable=NaN (division by zero) -- most likely, consequence of previous
+**** Pluto fails because of CSV can't install itself
+(probably fixed by starting from scratch env?)
+*** Nice to have
+**** declared types of the methods
+**** how unstable is every call: ratio of unstable *slots*
+** Formal model
+*** How is "surface" language different from IR?
+**** One difference: "just calls" on surface become dispatches or direct-calls in IR?
+**** What else?
+*** Ben thinks that the key is translation between those two — why?
+*** Do we need two flavours of IR: strongly typed and gradually typed?
+- So that we can state the "safe fragment" property.
+** Misc
+- What does stability mean:
+  + in docs
+  + in compiler sources
+- Are abstract types the same in terms of stability (always unstable) as (nontrivial) unions?

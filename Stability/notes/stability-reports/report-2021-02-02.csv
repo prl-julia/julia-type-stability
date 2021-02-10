@@ -1,0 +1,11 @@
+package,instances,stable,fail
+DifferentialEquations,6928,3482,0
+Flux,4284,3286,0
+Gadfly,42547,31052,3
+Gen,1570,954,0
+Genie,1401,1139,0
+IJulia,141,89,0
+JuMP,30902,19836,1
+Knet,9021,3071,0
+Plots,5159,3175,0
+Pluto,82970,56669,6
