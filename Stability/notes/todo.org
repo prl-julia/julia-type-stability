@@ -12,6 +12,8 @@
 *** Nice to have
 **** declared types of the methods
 **** how unstable is every call: ratio of unstable *slots*
+*** Data Analysis We May Be Interested In
+**** correlation b/w size and stability
 ** Formal model
 *** How is "surface" language different from IR?
 **** One difference: "just calls" on surface become dispatches or direct-calls in IR?
