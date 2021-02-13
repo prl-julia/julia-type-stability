@@ -8,16 +8,26 @@ function Pkg.Operations.gen_test_code(testfile::String;
         julia_args::Cmd=``,
         test_args::Cmd=``)
     code = """
+        #### Prepare env (standard)
+        #
         push!(LOAD_PATH, "@")
         push!(LOAD_PATH, "@v#.#")
         push!(LOAD_PATH, "@stdlib")
-        push!(LOAD_PATH, dirname("$(@__DIR__)"))  # add Stability.jl to LOAD_PATH
         $(Base.load_path_setup_code(false))
         cd($(repr(dirname(testfile))))
         append!(empty!(ARGS), $(repr(test_args.exec)))
-        using Stability                           # using Stability
+
+        #### Prepare Stability.jl
+        #
+        stability_root = dirname("$(@__DIR__)")
+        push!(LOAD_PATH, stability_root)
+        using Stability
         pakg=ENV["STAB_PKG_NAME"]
         wdir=ENV["WORK_DIR"]
+        #### End
+
+        #### Run tests (standard + try-catch)
+        #
         try
           @info "[Stability] [Package: " * pakg * "] Hooks are on. About to start testing."
           include($(repr(testfile)))
@@ -25,11 +35,20 @@ function Pkg.Operations.gen_test_code(testfile::String;
         catch error
           println("Warning: Error when running tests for package " * pakg)
         end
-                                                  # running stability analysis:
-        m = eval(Symbol(pakg)) # typeof(m) is Module
+
+        #### Init fresh sandbox, add CSV
+        #
+        fresh_loc = joinpath(wdir,"fresh")
+        mkpath(fresh_loc)
         using Pkg
+        Pkg.activate(fresh_loc)
         Pkg.add("CSV")
         using CSV
+        #### End
+
+        #### Run Stability Analysis:
+        #
+        m = eval(Symbol(pakg)) # typeof(m) is Module
         open(joinpath(wdir, "stability-errors.out"), "w") do err
           ms = module_stats(m, err)
           s = modstats_summary(ms)
@@ -38,6 +57,7 @@ function Pkg.Operations.gen_test_code(testfile::String;
           CSV.write(joinpath(wdir, "stability-stats.csv"), modstats_table(ms))
         end
         @info "[Stability] [Package: " * pakg * "] Finish"
+        #### End
         """
     @debug code
     return ```

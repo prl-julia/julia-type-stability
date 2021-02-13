@@ -7,7 +7,7 @@ using Core: MethodInstance
 using MethodAnalysis: visit
 using Pkg
 
-export is_stable_type, is_stable_call, is_stable_instance, all_mis_of_module,
+export is_stable_type, is_stable_call, all_mis_of_module,
        FunctionStats, ModuleStats, module_stats, modstats_summary, modstats_table,
        package_stats, loop_pkgs_stats,
        show_comma_sep
@@ -166,25 +166,27 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     for mi in mis
-        fs = get!(fstats_default, res.stats, mi.def)
+        if isdefined(mi.def, :generator) # can't handle @generated functions, Issue #11
+            @debug "GENERATED $(mi)"
+            continue
+        end
+
         try
             call = reconstruct_func_call(mi)
             if call === nothing # this mi is a constructor call - skip
                 continue
             end
+            fs = get!(fstats_default, res.stats, mi.def)
             fs.occurs += 1
             is_st = is_stable_call(call...);
             if is_st
-                fs.stable   += 1
-            else
-                fs.unstable += 1
+                fs.stable += 1
             end
         catch err
             fs.fail += 1
             print(errio, "ERROR: ");
             showerror(errio, err, stacktrace(catch_backtrace()))
             println(errio)
-            continue
         end
     end
     res
@@ -203,14 +205,23 @@ struct ModuleStatsRecord
     line :: Int
 end
 
-modstats_table(ms :: ModuleStats) :: Vector{ModuleStatsRecord} = begin
-    modl = "$(ms.modl)"
+modstats_table(ms :: ModuleStats, errio = stderr :: IO) :: Vector{ModuleStatsRecord} = begin
     res = []
     for (meth,fstats) in ms.stats
-        push!(res,
-              ModuleStatsRecord(
-                  modl, "$(meth.name)", fstats.occurs, fstats.stable/fstats.occurs,
-                  length(meth.source), "$(meth.file)", meth.line))
+        try
+            modl = "$(meth.module)"
+            mname = "$(meth.name)"
+            msrclen = length(meth.source)
+            mfile = "$(meth.file)"
+            mline = meth.line
+            push!(res,
+                  ModuleStatsRecord(
+                      modl, mname, fstats.occurs, fstats.stable/fstats.occurs,
+                      msrclen, mfile, mline))
+        catch err
+            println(errio, "ERROR: modstats_table: $(meth)");
+            throw(err)
+        end
     end
     res
 end
@@ -220,9 +231,15 @@ end
 #
 
 # package_stats: (pakg: String) -> IO ()
+#
 # Run stability analysis for the package `pakg`.
-# Result is printed on stdout for now (TODO: store as JSON)
+# Results are stored in the following files of the temp directory (see also "Side Effects" below):
+# * stability-stats.out
+# * stability-errors.out
+# * stability-stats.csv
+#
 # Assumes: current directory is a project, so Pkg.activate(".") makes sense.
+#
 # Side effects:
 #   Temporary directory with a sandbox for this package is created in the current
 #   directory. This temp directory is not removed upon completion and can be reused
