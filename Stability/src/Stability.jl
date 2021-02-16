@@ -171,12 +171,13 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             continue
         end
 
+        fs = get!(fstats_default, res.stats, mi.def)
         try
             call = reconstruct_func_call(mi)
             if call === nothing # this mi is a constructor call - skip
+                delete!(res.stats, mi.def)
                 continue
             end
-            fs = get!(fstats_default, res.stats, mi.def)
             fs.occurs += 1
             is_st = is_stable_call(call...);
             if is_st
