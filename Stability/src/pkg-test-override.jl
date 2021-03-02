@@ -29,32 +29,43 @@ function Pkg.Operations.gen_test_code(testfile::String;
         #### Run tests (standard + try-catch)
         #
         try
-          @info "[Stability] [Package: " * pakg * "] Hooks are on. About to start testing."
+          @info "[Stability] [Package: " * pakg * "] Hooks are on. About to start testing"
           include($(repr(testfile)))
-          @info "[Stability] [Package: " * pakg * "] Testing is finished successfully. About to start analysis"
+          @info "[Stability] [Package: " * pakg * "] Testing is finished successfully"
         catch error
           println("Warning: Error when running tests for package " * pakg)
         end
 
         #### Init fresh sandbox, add CSV
         #
+        using Pkg
+        @info "[Stability] [Package: " * pakg * "] Init new sandbox (to host CSV)"
         fresh_loc = joinpath(wdir,"fresh")
         mkpath(fresh_loc)
-        using Pkg
         Pkg.activate(fresh_loc)
+        @info "[Stability] [Package: " * pakg * "] About to Pkg.add CSV"
         Pkg.add("CSV")
+        @info "[Stability] [Package: " * pakg * "] About to start using CSV"
         using CSV
         #### End
 
         #### Run Stability Analysis:
         #
+        @info "[Stability] [Package: " * pakg * "] About to start analysis"
         m = eval(Symbol(pakg)) # typeof(m) is Module
         open(joinpath(wdir, "stability-errors.out"), "w") do err
           ms = module_stats(m, err)
+          @info "[Stability] [Package: " * pakg * "] Computed module stats"
           s = modstats_summary(ms)
-          @info "[Stability] [Package: " * pakg * "] About to store results in a file"
+          @info "[Stability] [Package: " * pakg * "] Computed module summary. About to store results in a file"
           open(out -> println(out, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
-          CSV.write(joinpath(wdir, "stability-stats.csv"), modstats_table(ms))
+          st = modstats_table(ms)
+          @info "[Stability] [Package: " * pakg * "] Table size: " * string(length(st))
+          #open(f-> println(f,st), "stabilty-stats.txt","w")
+          for r in st
+            println("About to write: " * string(r))
+            CSV.write(joinpath(wdir, "stability-stats.csv"), [r])
+          end
         end
         @info "[Stability] [Package: " * pakg * "] Finish"
         #### End

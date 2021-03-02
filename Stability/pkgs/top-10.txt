@@ -1,10 +1,10 @@
-Flux
-Pluto
-IJulia
-Gadfly
 DifferentialEquations
+Flux
 Gen
+Genie
+IJulia
 JuMP
 Knet
+MLJ
 Plots
-Genie
+Turing

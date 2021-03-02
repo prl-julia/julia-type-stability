@@ -197,13 +197,13 @@ modstats_summary(ms :: ModuleStats) =
   foldl((+), values(ms.stats); init=fstats_default())
 
 struct ModuleStatsRecord
-    modl :: String
+    modl     :: String
     funcname :: String
-    occurs :: Int
-    stable :: Float64
-    size :: Int
-    file :: String
-    line :: Int
+    occurs   :: Int
+    stable   :: Float64
+    size     :: Int
+    file     :: String
+    line     :: Int
 end
 
 modstats_table(ms :: ModuleStats, errio = stderr :: IO) :: Vector{ModuleStatsRecord} = begin
