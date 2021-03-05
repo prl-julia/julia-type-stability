@@ -15,9 +15,10 @@ using StatsPlots
 plot_col(df :: DataFrame, col :: Symbol, df_name :: String = "noname", prefix :: String = "") = begin
     mi=max(1, minimum(df[!, col]))
     ma=maximum(df[!, col])
-    @df df scatter(
+    @df df histogram2d(
            cols(col),
            :stable,
+           c=cgrad([:blue, :red]),
            size=(1200,800),
            legend=false,
            title=df_name,
