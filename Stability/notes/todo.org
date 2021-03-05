@@ -9,6 +9,9 @@
 **** DONE Sometimes stable=NaN (division by zero) -- most likely, consequence of previous
 **** TODO Pluto fails because of CSV can't install itself
 (probably fixed by starting from scratch env?)
+***** Ben says it's a bad idea to `Pkg.add` anything during test suite
+****** His idea: to setup environment with CSV for the testsuite
+****** Another idea (of me): dump results to a text file and read it back after test suite is done
 *** Nice to have
 **** declared types of the methods
 **** how unstable is every call: ratio of unstable *slots*
@@ -18,6 +21,7 @@
 ***** amount of control-flows (jumps)
 ***** amount of `return`s
 ***** stability of code near return site (probably hard to measure)
+*** TODO Change scatter plot to "heatmap" (it seems, 2D-histogram is the right term)
 ** Formal model
 *** Two IRs
 **** How is "surface" language different from IR?
