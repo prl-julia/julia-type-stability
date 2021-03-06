@@ -36,19 +36,6 @@ function Pkg.Operations.gen_test_code(testfile::String;
           println("Warning: Error when running tests for package " * pakg)
         end
 
-        #### Init fresh sandbox, add CSV
-        #
-        using Pkg
-        @info "[Stability] [Package: " * pakg * "] Init new sandbox (to host CSV)"
-        fresh_loc = joinpath(wdir,"fresh")
-        mkpath(fresh_loc)
-        Pkg.activate(fresh_loc)
-        @info "[Stability] [Package: " * pakg * "] About to Pkg.add CSV"
-        Pkg.add("CSV")
-        @info "[Stability] [Package: " * pakg * "] About to start using CSV"
-        using CSV
-        #### End
-
         #### Run Stability Analysis:
         #
         @info "[Stability] [Package: " * pakg * "] About to start analysis"
@@ -61,11 +48,7 @@ function Pkg.Operations.gen_test_code(testfile::String;
           open(out -> println(out, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
           st = modstats_table(ms)
           @info "[Stability] [Package: " * pakg * "] Table size: " * string(length(st))
-          #open(f-> println(f,st), "stabilty-stats.txt","w")
-          for r in st
-            println("About to write: " * string(r))
-            CSV.write(joinpath(wdir, "stability-stats.csv"), [r])
-          end
+          open(f-> println(f,st), joinpath(wdir, "stabilty-stats.txt"),"w")
         end
         @info "[Stability] [Package: " * pakg * "] Finish"
         #### End

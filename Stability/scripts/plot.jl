@@ -4,7 +4,7 @@ ENV["GKSwstype"] = "nul"  # can run headless
 
 using StatsPlots
 
-# Plot a scatter plot with Y=stability and X=column with the
+# Plot a histogram with Y=stability and X=column with the
 # given name (col).
 # Input:
 # - dataframe with columns: :stabilty and col (at least).
@@ -24,12 +24,21 @@ plot_col(df :: DataFrame, col :: Symbol, df_name :: String = "noname", prefix ::
            title=df_name,
            xaxis=:log10,
            xlim=[mi,ma])
-    savefig(joinpath(prefix,"$(df_name)-$(col).png"))
+    out=joinpath(prefix,"$(df_name)-$(col).png")
+    @info "About to store the plot in $out"
+    savefig(out)
+end
+
+plot_pkg(pkg :: String, col :: Symbol = :size, odir :: String = ".", idir :: String = ".") = begin
+    in = "$idir/$pkg/stability-stats.csv"
+    isfile(in) || (@warn "No stats file for package $pkg (failed to open $in)"; return)
+    df = CSV.read(in, DataFrame)
+    plot_col(df, col, pkg, odir)
 end
 
 # Plot with plot_col for every package in the list stored in pkgs_file
 # Assumes: every package name corespondes to a dir in the current dir
-plot_pkgs(pkgs_file :: String, col :: Symbol) = begin
+plot_all_pkgs(pkgs_file :: String, col :: Symbol = :size) = begin
     isfile(pkgs_file) || (@error "Invalid package list file $pkgs_file"; return)
 
     odir="by-$col"
@@ -39,9 +48,6 @@ plot_pkgs(pkgs_file :: String, col :: Symbol) = begin
 
     pkgs = readlines(pkgs_file)
     for p in pkgs
-        in = "$p/stability-stats.csv"
-        isfile(in) || (@warn "No stats file for package $p"; continue)
-        df = CSV.read(in, DataFrame)
-        plot_col(df, col, p, odir)
+        plot_pkg(p, col, odir)
     end
 end

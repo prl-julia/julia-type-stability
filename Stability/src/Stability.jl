@@ -6,6 +6,7 @@ module Stability
 using Core: MethodInstance
 using MethodAnalysis: visit
 using Pkg
+using CSV
 
 export is_stable_type, is_stable_call, all_mis_of_module,
        FunctionStats, ModuleStats, module_stats, modstats_summary, modstats_table,
@@ -260,6 +261,10 @@ package_stats(pakg :: String) = begin
         Pkg.activate(".")
         Pkg.add(pakg)
         Pkg.test(pakg)
+        st =
+            eval(Meta.parse(
+                open(f-> read(f,String), joinpath(wdir, "stabilty-stats.txt","r"))))
+        CSV.write(joinpath(work_dir, "stability-stats.csv"), st)
     catch e
         println("Error when running tests for package $(pakg)")
     finally
