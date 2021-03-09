@@ -261,19 +261,25 @@ package_stats(pakg :: String) = begin
         Pkg.activate(".")
         Pkg.add(pakg)
         Pkg.test(pakg)
-        st =
-            eval(Meta.parse(
-                open(f-> read(f,String), joinpath(wdir, "stabilty-stats.txt","r"))))
-        CSV.write(joinpath(work_dir, "stability-stats.csv"), st)
-    catch e
+    catch err
         println("Error when running tests for package $(pakg)")
+        errio=stderr
+        print(errio, "ERROR: ");
+        showerror(errio, err, stacktrace(catch_backtrace()))
+        println(errio)
     finally
         cd(start_dir)
         # TODO: |--- it's hard to figure what's right path to activate here
         #       v    we go with Stability.jl's root
         Pkg.activate(dirname(@__DIR__))
     end
-
+    resf = joinpath(work_dir, "stability-stats.txt")
+    isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
+    st =
+        eval(Meta.parse(
+            open(f-> read(f,String), resf,"r")))
+    CSV.write(joinpath(work_dir, "stability-stats.csv"), st)
+    @info "[Stability] [Package: " * pakg * "] Results successfully converted to CSV"
 end
 
 loop_pkgs_stats(pksg_list_filename::String) = begin

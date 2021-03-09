@@ -48,7 +48,9 @@ function Pkg.Operations.gen_test_code(testfile::String;
           open(out -> println(out, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
           st = modstats_table(ms)
           @info "[Stability] [Package: " * pakg * "] Table size: " * string(length(st))
-          open(f-> println(f,st), joinpath(wdir, "stabilty-stats.txt"),"w")
+          outf = joinpath(wdir, "stability-stats.txt")
+          @info "[Stability] [Package: " * pakg * "] About to store results to: " * outf
+          open(f-> println(f,st), outf,"w")
         end
         @info "[Stability] [Package: " * pakg * "] Finish"
         #### End
