@@ -19,7 +19,7 @@ plot_col(df :: DataFrame, col :: Symbol, df_name :: String = "noname", prefix ::
            cols(col),
            :stable,
            c=cgrad([:blue, :red]),
-           nbins=(60,30),
+           nbins=(200,20),
            size=(1200,800),
            legend=false,
            title=df_name,
