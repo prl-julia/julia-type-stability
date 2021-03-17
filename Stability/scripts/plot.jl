@@ -18,12 +18,11 @@ plot_col(df :: DataFrame, col :: Symbol, df_name :: String = "noname", prefix ::
     @df df histogram2d(
            cols(col),
            :stable,
-           c=cgrad([:blue, :red]),
-           nbins=(400,20),
+           c=cgrad(:viridis),
+           nbins=(20,10),
            size=(1200,800),
            legend=false,
            title=df_name,
-           xaxis=:log10,
            xlim=[mi,ma],
            ylim=[0,1.2])
     out=joinpath(prefix,"$(df_name)-$(col).png")
