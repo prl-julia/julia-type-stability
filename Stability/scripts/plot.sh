@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-julia -L ../scripts/plot.jl -e "plot_all_pkgs(\"top-10.txt\", :size)"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+julia -O0 -L "$DIR/plot.jl" -e "plot_all_pkgs(\"$1\")"

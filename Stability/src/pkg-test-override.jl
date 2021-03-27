@@ -52,7 +52,7 @@ function Pkg.Operations.gen_test_code(testfile::String;
           @info "[Stability] [Package: " * pakg * "] About to store results to: " * outf
           open(f-> println(f,st), outf,"w")
         end
-        @info "[Stability] [Package: " * pakg * "] Finish"
+        @info "[Stability] [Package: " * pakg * "] Finish testing + analysis"
         #### End
         """
     @debug code

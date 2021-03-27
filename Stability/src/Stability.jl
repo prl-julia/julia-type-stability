@@ -246,20 +246,25 @@ end
 #   Temporary directory with a sandbox for this package is created in the current
 #   directory. This temp directory is not removed upon completion and can be reused
 #   in the future runs. This reuse shouldn't harm anyone (in theory).
+#
+# Parallel execution:
+#   Possible with the aid of GNU parallel and the tine script in scripts/proc_package_parallel.sh.
+#   It requires a file with a list of packages passed as the single argument.
 package_stats(pakg :: String) = begin
     # prepare a subdir in the current dir to test this particular path
     # and enter it? Given that Pkg.test already implements sandboxing...
     start_dir=pwd()
-    mkpath(pakg)
-    cd(pakg)
     work_dir = pwd()
     ENV["STAB_PKG_NAME"] = pakg
     ENV["WORK_DIR"] = work_dir
 
+    #println("Hi from Stability.jl! Processing package $pakg")
+    @info "[Stability] [Package: " * pakg * "] Starting up"
     # set up and test the package `pakg`
     try
-        Pkg.activate(".")
+        Pkg.activate() # Switch from Stability package local env to "global" env
         Pkg.add(pakg)
+        @info "[Stability] [Package: " * pakg * "] Added. Now on to testing"
         Pkg.test(pakg)
     catch err
         println("Error when running tests for package $(pakg)")
@@ -269,9 +274,7 @@ package_stats(pakg :: String) = begin
         println(errio)
     finally
         cd(start_dir)
-        # TODO: |--- it's hard to figure what's right path to activate here
-        #       v    we go with Stability.jl's root
-        Pkg.activate(dirname(@__DIR__))
+        Pkg.activate(dirname(@__DIR__)) # switch back to Stability env
     end
     resf = joinpath(work_dir, "stability-stats.txt")
     isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
@@ -279,7 +282,7 @@ package_stats(pakg :: String) = begin
         eval(Meta.parse(
             open(f-> read(f,String), resf,"r")))
     CSV.write(joinpath(work_dir, "stability-stats.csv"), st)
-    @info "[Stability] [Package: " * pakg * "] Results successfully converted to CSV"
+    @info "[Stability] [Package: " * pakg * "] Results successfully converted to CSV. Bye!"
 end
 
 loop_pkgs_stats(pksg_list_filename::String) = begin
@@ -291,6 +294,11 @@ loop_pkgs_stats(pksg_list_filename::String) = begin
             package_stats(p)
         end
     end
+end
+
+add_all_pkgs(pksg_list_filename::String) = begin
+    pkgs = readlines(pksg_list_filename)
+    Pkg.add(pkgs)
 end
 
 end # module

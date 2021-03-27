@@ -1,6 +1,4 @@
-using Revise
 using Pkg
-Pkg.activate(".")
+Pkg.activate(ENV["STABILITY_HOME"])
 Pkg.instantiate()
 using Stability
-cd("pkgs")
