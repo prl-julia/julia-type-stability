@@ -3,12 +3,12 @@
 # Inspired by julia/stdlib/InteractiveUtils/src/codeview.jl 
 module Stability
 
-using Core: MethodInstance
+using Core: MethodInstance, CodeInstance, CodeInfo
 using MethodAnalysis: visit
 using Pkg
 using CSV
 
-export is_stable_type, is_stable_call, all_mis_of_module,
+export is_concrete_type, is_grounded_call, all_mis_of_module,
        FunctionStats, ModuleStats, module_stats, modstats_summary, modstats_table,
        package_stats, loop_pkgs_stats,
        show_comma_sep
@@ -30,7 +30,7 @@ end
 # juila> ENV["JULIA_DEBUG"] = nothing
 
 # Follows `warntype_type_printer` in the above mentioned file
-is_stable_type(@nospecialize(ty)) = begin
+is_concrete_type(@nospecialize(ty)) = begin
     if ty isa Type && (!Base.isdispatchelem(ty) || ty == Core.Box)
         if ty isa Union && Base.is_expected_union(ty)
             true # this is a "mild" problem, so we round up to "stable"
@@ -53,15 +53,19 @@ struct TypeInferenceError <: Exception
     t :: Any
 end
 
-# f: function
-# t: tuple of argument types
-function is_stable_call(@nospecialize(f), @nospecialize(t))
+# Args:
+# * f: function
+# * t: tuple of argument types
+# Returns: pair (CodeInstance - typed IR, Inferred Type of the Body)
+function run_type_inference(@nospecialize(f), @nospecialize(t))
     ct = code_typed(f, t, optimize=false)
     if length(ct) == 0
         throw(TypeInferenceError(f,t)) # type inference failed
     end
-    ct1 = ct[1] # we ought to have just one method body, I think
-    src = ct1[1] # that's code; [2] is return type, I think
+    ct[1] # we ought to have just one method body, I think
+end
+
+is_grounded_call(src :: CodeInfo) = begin
     slottypes = src.slottypes
 
     # the following check is taken verbatim from code_warntype
@@ -71,10 +75,10 @@ function is_stable_call(@nospecialize(f), @nospecialize(t))
     end
 
     result = true
-    
+
     slotnames = Base.sourceinfo_slotnames(src)
     for i = 1:length(slottypes)
-        stable = is_stable_type(slottypes[i])
+        stable = is_concrete_type(slottypes[i])
         @debug "is_stable_call slot:" slotnames[i] slottypes[i] stable
         result = result && stable
     end
@@ -140,21 +144,23 @@ end
 
 # function stats are only mutable during their calculation
 mutable struct FunctionStats
-  occurs  :: Int  # how many occurances of the method found (all instances)
-  stable  :: Int  # how many stable instances
-  fail    :: Int  # how many times fail to detect stability due to @code_typed (cf. Issues #7, #8)
+  occurs   :: Int  # how many occurances of the method found (all instances)
+  stable   :: Int  # how many stable instances
+  grounded :: Int  # how many grounded instances
+  fail     :: Int  # how many times fail to detect stability due to @code_typed (cf. Issues #7, #8)
 end
 
-fstats_default() = FunctionStats(0,0,0)
+fstats_default() = FunctionStats(0,0,0,0)
 import Base.(+)
 (+)(fs1 :: FunctionStats, fs2 :: FunctionStats) =
   FunctionStats(
     fs1.occurs+fs2.occurs,
     fs1.stable+fs2.stable,
+    fs1.grounded+fs2.grounded,
     fs1.fail+fs2.fail)
 
 show_comma_sep(fs::FunctionStats) =
-    "$(fs.occurs),$(fs.stable),$(fs.fail)"
+    "$(fs.occurs),$(fs.stable),$(fs.grounded),$(fs.fail)"
 
 struct ModuleStats
   modl   :: Module
@@ -180,9 +186,12 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
                 continue
             end
             fs.occurs += 1
-            is_st = is_stable_call(call...);
-            if is_st
+            (code,rettype) = run_type_inference(call...);
+            if is_concrete_type(rettype)
                 fs.stable += 1
+                if is_grounded_call(code)
+                    fs.grounded += 1
+                end
             end
         catch err
             fs.fail += 1
@@ -202,6 +211,7 @@ struct ModuleStatsRecord
     funcname :: String
     occurs   :: Int
     stable   :: Float64
+    grounded :: Float64
     size     :: Int
     file     :: String
     line     :: Int
@@ -218,7 +228,8 @@ modstats_table(ms :: ModuleStats, errio = stderr :: IO) :: Vector{ModuleStatsRec
             mline = meth.line
             push!(res,
                   ModuleStatsRecord(
-                      modl, mname, fstats.occurs, fstats.stable/fstats.occurs,
+                      modl, mname, fstats.occurs,
+                      fstats.stable/fstats.occurs, fstats.grounded/fstats.occurs,
                       msrclen, mfile, mline))
         catch err
             println(errio, "ERROR: modstats_table: $(meth)");
@@ -235,34 +246,33 @@ end
 # package_stats: (pakg: String) -> IO ()
 #
 # Run stability analysis for the package `pakg`.
-# Results are stored in the following files of the temp directory (see also "Side Effects" below):
+# Results are stored in the following files of the current directory (see also "Side Effects" below):
 # * stability-stats.out
 # * stability-errors.out
 # * stability-stats.csv
 #
-# Assumes: current directory is a project, so Pkg.activate(".") makes sense.
-#
 # Side effects:
-#   Temporary directory with a sandbox for this package is created in the current
-#   directory. This temp directory is not removed upon completion and can be reused
-#   in the future runs. This reuse shouldn't harm anyone (in theory).
+#   In the current directory, creates a temporary environment for this package.
+#   Reusing this env shouldn't harm anyone (in theory).
 #
 # Parallel execution:
 #   Possible with the aid of GNU parallel and the tine script in scripts/proc_package_parallel.sh.
 #   It requires a file with a list of packages passed as the single argument.
+#
+# REPL:
+#   Make sure to run from a reasonable dir, e.g. create a dir for this package yourself
+#   and cd into it before calling.
+#
 package_stats(pakg :: String) = begin
-    # prepare a subdir in the current dir to test this particular path
-    # and enter it? Given that Pkg.test already implements sandboxing...
-    start_dir=pwd()
-    work_dir = pwd()
+    start_dir = pwd()
+    work_dir  = pwd()
     ENV["STAB_PKG_NAME"] = pakg
     ENV["WORK_DIR"] = work_dir
 
-    #println("Hi from Stability.jl! Processing package $pakg")
     @info "[Stability] [Package: " * pakg * "] Starting up"
     # set up and test the package `pakg`
     try
-        Pkg.activate() # Switch from Stability package local env to "global" env
+        Pkg.activate(".") # Switch from Stability package-local env to a temp env
         Pkg.add(pakg)
         @info "[Stability] [Package: " * pakg * "] Added. Now on to testing"
         Pkg.test(pakg)
