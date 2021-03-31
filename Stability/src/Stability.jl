@@ -213,6 +213,8 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             continue
         end
 
+        is_blocklisted(modl, mi.def.module) && (@info "alien: $mi.def"; continue)
+
         fs = get!(fstats_default, res.stats, mi.def)
         try
             call = reconstruct_func_call(mi)
@@ -315,6 +317,18 @@ modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
             end
         end
         (resmeth,resmi)
+end
+
+is_blocklisted(modl_proccessed :: Module, modl_mi :: Module) = begin
+    mmi="$modl_mi"
+    mp="$modl_proccessed"
+
+    startswith(mmi,mp) && return false
+
+    mp == "DifferentialEquations" &&
+        mmi != "Base" && !startswith(mmi, "Core") && return false
+
+    return true
 end
 
 #
