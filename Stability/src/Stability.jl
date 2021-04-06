@@ -10,7 +10,7 @@ using CSV
 
 export is_concrete_type, is_grounded_call, all_mis_of_module,
        FunctionStats, ModuleStats, module_stats, modstats_summary, modstats_table,
-       package_stats, loop_pkgs_stats,
+       package_stats, loop_pkgs_stats, cfg_stats,
        show_comma_sep
 
 # We do nasty things with Pkg.test
@@ -142,22 +142,56 @@ end
 #  Stats for type stability: Module level
 #
 
-# function stats are only mutable during their calculation
+struct CfgStats
+    st       :: Bool # if the instance is stable
+    gd       :: Bool # if the instance is grounded
+    gt       :: Int  # number of gotos in the instance
+    rt       :: Int  # number of returns in the instance
+end
+
+cfgstats_default() = CfgStats(0,0)
+
+# Stats about control-flow graph of a method
+# Currently, number of gotos, and number of returns
+cfg_stats(code :: CodeInfo) = begin
+    gt = 0
+    rt = 0
+
+    for st in code.code
+        if is_goto(st)
+            gt += 1
+        elseif is_return(st)
+            rt += 1
+        end
+    end
+    (gt,rt)
+end
+
+is_goto(::Core.GotoNode) = true
+is_goto(e::Expr) = e.head == :gotoifnot
+is_goto(::Any) = false
+is_return(e::Expr) = e.head == :return
+is_return(::Any) = false
+
+# Statistics gathered per method. (It's called "func" for histerical reasons.)
+# Note on "mutable": stats are only mutable during their calculation.
 mutable struct FunctionStats
-  occurs   :: Int  # how many occurances of the method found (all instances)
-  stable   :: Int  # how many stable instances
-  grounded :: Int  # how many grounded instances
-  fail     :: Int  # how many times fail to detect stability due to @code_typed (cf. Issues #7, #8)
+    occurs   :: Int  # how many instances of the method found
+    stable   :: Int  # how many stable instances of the method
+    grounded :: Int  # how many grounded instances of the method
+    fail     :: Int  # how many times fail to detect stability of an instance (cf. Issues #7, #8)
 end
 
 fstats_default() = FunctionStats(0,0,0,0)
+
 import Base.(+)
 (+)(fs1 :: FunctionStats, fs2 :: FunctionStats) =
   FunctionStats(
-    fs1.occurs+fs2.occurs,
-    fs1.stable+fs2.stable,
-    fs1.grounded+fs2.grounded,
-    fs1.fail+fs2.fail)
+      fs1.occurs+fs2.occurs,
+      fs1.stable+fs2.stable,
+      fs1.grounded+fs2.grounded,
+      fs1.fail+fs2.fail
+  )
 
 show_comma_sep(fs::FunctionStats) =
     "$(fs.occurs),$(fs.stable),$(fs.grounded),$(fs.fail)"
@@ -165,9 +199,10 @@ show_comma_sep(fs::FunctionStats) =
 struct ModuleStats
   modl   :: Module
   stats  :: Dict{Method, FunctionStats}
+  cfgs   :: Dict{MethodInstance, CfgStats}
 end
 
-ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, FunctionStats}())
+ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, FunctionStats}(), Dict{Method, CfgStats}())
 
 module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
@@ -185,14 +220,24 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
                 delete!(res.stats, mi.def)
                 continue
             end
+
             fs.occurs += 1
+
+            # handle stability/groundedness
+            mi_st = false
+            mi_gd = false
             (code,rettype) = run_type_inference(call...);
             if is_concrete_type(rettype)
                 fs.stable += 1
+                mi_st = true
                 if is_grounded_call(code)
                     fs.grounded += 1
+                    mi_gd = true
                 end
             end
+
+            # handle instance CFG stats
+            res.cfgs[mi] = CfgStats(mi_st, mi_gd, cfg_stats(code)...)
         catch err
             fs.fail += 1
             print(errio, "ERROR: ");
@@ -206,7 +251,7 @@ end
 modstats_summary(ms :: ModuleStats) =
   foldl((+), values(ms.stats); init=fstats_default())
 
-struct ModuleStatsRecord
+struct ModuleStatsPerMethodRecord
     modl     :: String
     funcname :: String
     occurs   :: Int
@@ -217,26 +262,59 @@ struct ModuleStatsRecord
     line     :: Int
 end
 
-modstats_table(ms :: ModuleStats, errio = stderr :: IO) :: Vector{ModuleStatsRecord} = begin
-    res = []
-    for (meth,fstats) in ms.stats
-        try
-            modl = "$(meth.module)"
-            mname = "$(meth.name)"
-            msrclen = length(meth.source)
-            mfile = "$(meth.file)"
-            mline = meth.line
-            push!(res,
-                  ModuleStatsRecord(
-                      modl, mname, fstats.occurs,
-                      fstats.stable/fstats.occurs, fstats.grounded/fstats.occurs,
-                      msrclen, mfile, mline))
-        catch err
-            println(errio, "ERROR: modstats_table: $(meth)");
-            throw(err)
+struct ModuleStatsPerInstanceRecord
+    modl     :: String
+    funcname :: String
+    st       :: Bool
+    gd       :: Bool
+    gt       :: Int
+    rt       :: Int
+    file     :: String
+    line     :: Int
+end
+
+modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
+    Tuple{Vector{ModuleStatsPerMethodRecord}, Vector{ModuleStatsPerInstanceRecord}} = begin
+        resmeth = []
+        resmi = []
+        for (meth,fstats) in ms.stats
+            try
+                modl = "$(meth.module)"
+                mname = "$(meth.name)"
+                msrclen = length(meth.source)
+                mfile = "$(meth.file)"
+                mline = meth.line
+                push!(resmeth,
+                      ModuleStatsPerMethodRecord(
+                          modl, mname, fstats.occurs,
+                          fstats.stable/fstats.occurs, fstats.grounded/fstats.occurs,
+                          msrclen,
+                          mfile, mline))
+            catch err
+                println(errio, "ERROR: modstats_table: $(meth)");
+                throw(err)
+            end
         end
-    end
-    res
+        for (mi,cfgst) in ms.cfgs
+            try
+                meth = mi.def
+                modl = "$(meth.module)"
+                mname = "$(meth.name)"
+                msrclen = length(meth.source)
+                mfile = "$(meth.file)"
+                mline = meth.line
+                push!(resmi,
+                      ModuleStatsPerInstanceRecord(
+                          modl, mname,
+                          cfgst.st, cfgst.gd,
+                          cfgst.gt, cfgst.rt,
+                          mfile, mline))
+            catch err
+                println(errio, "ERROR: modstats_table: $(meth)");
+                throw(err)
+            end
+        end
+        (resmeth,resmi)
 end
 
 #
@@ -286,12 +364,20 @@ package_stats(pakg :: String) = begin
         cd(start_dir)
         Pkg.activate(dirname(@__DIR__)) # switch back to Stability env
     end
-    resf = joinpath(work_dir, "stability-stats.txt")
+
+    resf = joinpath(work_dir, "stability-stats-per-method.txt")
     isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
     st =
         eval(Meta.parse(
             open(f-> read(f,String), resf,"r")))
-    CSV.write(joinpath(work_dir, "stability-stats.csv"), st)
+    CSV.write(joinpath(work_dir, "stability-stats-per-method.csv"), st)
+
+    resf = joinpath(work_dir, "stability-stats-per-instance.txt")
+    isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
+    st =
+        eval(Meta.parse(
+            open(f-> read(f,String), resf,"r")))
+    CSV.write(joinpath(work_dir, "stability-stats-per-instance.csv"), st)
     @info "[Stability] [Package: " * pakg * "] Results successfully converted to CSV. Bye!"
 end
 
