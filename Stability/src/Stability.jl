@@ -310,7 +310,7 @@ modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
                           cfgst.gt, cfgst.rt,
                           mfile, mline))
             catch err
-                println(errio, "ERROR: modstats_table: $(meth)");
+                println(errio, "ERROR: modstats_table: $(mi)");
                 throw(err)
             end
         end

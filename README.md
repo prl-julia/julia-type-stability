@@ -9,7 +9,7 @@ Some notes can be found on the
 make deps
 ```
 
-## Quick Start
+## Quick Start: REPL
 
 Starting from `./Stability` do:
 
@@ -31,3 +31,20 @@ To compose the report, escape form Julia to Bash for a moment (`;`) and do:
 ```
 
 this will create `report.csv` in `./Stability/pkgs`.
+
+## CLI Interface
+
+Some useful scripts live in `Stability/scripts`. E.g. to process a list of packages, you may use:
+
+```
+scripts/proc_packages_parallel.sh top-10.txt
+```
+
+If this works fine, you should be able to get a set of plots using
+
+```
+scripts/plot.sh top-10.txt
+```
+
+`
+

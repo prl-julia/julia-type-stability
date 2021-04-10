@@ -27,8 +27,10 @@ plot_col(df :: DataFrame, ox :: Symbol, oy :: Symbol, df_name :: String = "nonam
            ylim=[0,1.2])
 end
 
-plot_pkg(pkg :: String, ox :: Symbol = :size, oy :: Symbol = :stable, odir :: String = ".", idir :: String = ".") = begin
-    in = "$idir/$pkg/stability-stats.csv"
+plot_pkg(pkg :: String; ox :: Symbol = :size, oy :: Symbol = :stable,
+         granularity :: String = "method",
+         idir :: String = ".", odir :: String = ".") = begin
+    in = "$idir/$pkg/stability-stats-per-$(granularity).csv"
     isfile(in) || (@warn "No stats file for package $pkg (failed to open $in)"; return)
     df = CSV.read(in, DataFrame)
     plot_col(df, ox, oy, pkg, odir)
@@ -36,7 +38,9 @@ end
 
 # Plot with plot_col for every package in the list stored in pkgs_file
 # Assumes: every package name corespondes to a dir in the current dir
-plot_all_pkgs(pkgs_file :: String, ox :: Symbol = :size, oy :: Symbol = :stable, odir :: String = ".") = begin
+plot_all_pkgs(pkgs_file :: String, ox :: Symbol = :size, oy :: Symbol = :stable,
+			granularity :: String = "method",
+			odir :: String = ".") = begin
     isfile(pkgs_file) || (@error "Invalid package list file $pkgs_file"; return)
 
     #!isdir(odir) || rm(odir, force=true, recursive=true) # more reproducible
@@ -46,7 +50,7 @@ plot_all_pkgs(pkgs_file :: String, ox :: Symbol = :size, oy :: Symbol = :stable,
     pkgs = readlines(pkgs_file)
     plots = []
     for p in pkgs
-        push!(plots, plot_pkg(p, ox, oy, odir))
+        push!(plots, plot_pkg(p, ox=ox, oy=oy, odir=odir, granularity=granularity))
     end
     plot(plots..., layout = (2, 5), size=((1200+900)*5,800*2))
     out=joinpath(odir,"$(oy)-by-$(ox).png")
