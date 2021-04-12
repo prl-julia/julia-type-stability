@@ -325,10 +325,7 @@ is_blocklisted(modl_proccessed :: Module, modl_mi :: Module) = begin
 
     startswith(mmi,mp) && return false
 
-    mp == "DifferentialEquations" &&
-        mmi != "Base" && !startswith(mmi, "Core") && return false
-
-    return true
+    return mmi == "Base" || startswith(mmi, "Core")
 end
 
 #

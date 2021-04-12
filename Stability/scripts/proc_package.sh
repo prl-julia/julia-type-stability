@@ -10,5 +10,5 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 mkdir -p "$p/depot"
 pushd $p
 STABILITY_HOME="$DIR/../"
-DEV=YES JULIA_DEPOT_PATH="`pwd`/depot" STABILITY_HOME="$STABILITY_HOME" julia -L "$STABILITY_HOME/startup.jl" -e "package_stats(\"$p\")"
+DEV=YES JULIA_DEPOT_PATH="`pwd`/depot" STABILITY_HOME="$STABILITY_HOME" timeout 1800 julia -L "$STABILITY_HOME/startup.jl" -e "package_stats(\"$p\")"
 popd
