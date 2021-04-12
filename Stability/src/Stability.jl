@@ -173,7 +173,7 @@ is_goto(::Any) = false
 is_return(e::Expr) = e.head == :return
 is_return(::Any) = false
 
-# Statistics gathered per method. (It's called "func" for histerical reasons.)
+# Statistics gathered per method. (It's called "function" for histerical reasons.)
 # Note on "mutable": stats are only mutable during their calculation.
 mutable struct FunctionStats
     occurs   :: Int  # how many instances of the method found
@@ -325,7 +325,7 @@ is_blocklisted(modl_proccessed :: Module, modl_mi :: Module) = begin
 
     startswith(mmi,mp) && return false
 
-    return mmi == "Base" || startswith(mmi, "Core")
+    return startswith(mmi, "Base") || startswith(mmi, "Core")
 end
 
 #
