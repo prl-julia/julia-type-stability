@@ -43,14 +43,17 @@ function Pkg.Operations.gen_test_code(testfile::String;
         open(joinpath(wdir, "stability-errors.out"), "w") do err
           ms = module_stats(m, err)
           @info "[Stability] [Package: " * pakg * "] Computed module stats"
-          s = modstats_summary(ms)
+
+          summary = modstats_summary(ms)
           @info "[Stability] [Package: " * pakg * "] Computed module summary. About to store results in a file"
-          open(out -> println(out, pakg * "," * show_comma_sep(s)), joinpath(wdir, "stability-summary.out"), "w")
+          open(out -> println(out, pakg * "," * show_comma_sep(summary)), joinpath(wdir, "stability-summary.out"), "w")
+
           (methst, mist) = modstats_table(ms)
           @info "[Stability] [Package: " * pakg * "] Table size (per method): " * string(length(methst))
           outf = joinpath(wdir, "stability-stats-per-method.txt")
           @info "[Stability] [Package: " * pakg * "] About to store per method results to: " * outf
           open(f-> println(f,methst), outf,"w")
+
           @info "[Stability] [Package: " * pakg * "] Table size (per instance): " * string(length(mist))
           outf = joinpath(wdir, "stability-stats-per-instance.txt")
           @info "[Stability] [Package: " * pakg * "] About to store per instance results to: " * outf

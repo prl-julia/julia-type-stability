@@ -179,22 +179,30 @@ mutable struct FunctionStats
     occurs   :: Int  # how many instances of the method found
     stable   :: Int  # how many stable instances of the method
     grounded :: Int  # how many grounded instances of the method
+    nospec   :: Int  # the nospecialized bitmap (if /=0, there are nospec. params)
+    vararg   :: Int  # if the method is a varags method (0/1)
     fail     :: Int  # how many times fail to detect stability of an instance (cf. Issues #7, #8)
 end
 
-fstats_default() = FunctionStats(0,0,0,0)
+# convenient default constructor
+fstats_default(nospec=0, vararg=0) = FunctionStats(0,0,0,nospec,vararg,0)
 
+# This is needed for modstats_summary: we smash data about individual methods together
+# and get coarse-grained module stats
+# This has to be clewver: many things can be simply summed, but not all.
 import Base.(+)
 (+)(fs1 :: FunctionStats, fs2 :: FunctionStats) =
   FunctionStats(
       fs1.occurs+fs2.occurs,
       fs1.stable+fs2.stable,
       fs1.grounded+fs2.grounded,
+      fs1.nospec + min(1, abs(fs2.nospec)),
+      fs1.vararg + fs2.vararg,
       fs1.fail+fs2.fail
   )
 
-show_comma_sep(fs::FunctionStats) =
-    "$(fs.occurs),$(fs.stable),$(fs.grounded),$(fs.fail)"
+# This is needed for modstats_summary
+show_comma_sep(xs::Vector) = join(xs, ",")
 
 struct ModuleStats
   modl   :: Module
@@ -203,6 +211,11 @@ struct ModuleStats
 end
 
 ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, FunctionStats}(), Dict{Method, CfgStats}())
+
+modstats_summary(ms :: ModuleStats) = begin
+  fs = foldl((+), values(ms.stats); init=fstats_default())
+  [length(ms.stats),fs.occurs,fs.stable,fs.grounded,fs.nospec,fs.vararg,fs.fail]
+end
 
 module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
@@ -213,9 +226,11 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             continue
         end
 
-        is_blocklisted(modl, mi.def.module) && (@info "alien: $mi.def"; continue)
+        is_blocklisted(modl, mi.def.module) && (@debug "alien: $mi.def defined in $mi.def.module"; continue)
 
-        fs = get!(fstats_default, res.stats, mi.def)
+        fs = get!(res.stats, mi.def,
+                  fstats_default(mi.def.nospecialize,
+                                 occursin("Vararg","$(mi.def.sig)")))
         try
             call = reconstruct_func_call(mi)
             if call === nothing # this mi is a constructor call - skip
@@ -250,15 +265,14 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
     res
 end
 
-modstats_summary(ms :: ModuleStats) =
-  foldl((+), values(ms.stats); init=fstats_default())
-
 struct ModuleStatsPerMethodRecord
     modl     :: String
     funcname :: String
     occurs   :: Int
     stable   :: Float64
     grounded :: Float64
+    nospec   :: Int
+    vararg   :: Int
     size     :: Int
     file     :: String
     line     :: Int
@@ -290,6 +304,7 @@ modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
                       ModuleStatsPerMethodRecord(
                           modl, mname, fstats.occurs,
                           fstats.stable/fstats.occurs, fstats.grounded/fstats.occurs,
+                          meth.nospecialize, fstats.vararg,
                           msrclen,
                           mfile, mline))
             catch err
@@ -325,7 +340,11 @@ is_blocklisted(modl_proccessed :: Module, modl_mi :: Module) = begin
 
     startswith(mmi,mp) && return false
 
-    return startswith(mmi, "Base") || startswith(mmi, "Core")
+    return startswith(mmi, "Base") ||
+        startswith(mmi, "Core") ||
+        startswith(mmi, "REPL") ||
+        mmi in ["Test", "Random",] ||
+        false
 end
 
 #
