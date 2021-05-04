@@ -371,7 +371,7 @@ end
 #   Make sure to run from a reasonable dir, e.g. create a dir for this package yourself
 #   and cd into it before calling.
 #
-package_stats(pakg :: String) = begin
+package_stats(pakg :: String, ver :: String = nothing) = begin
     start_dir = pwd()
     work_dir  = pwd()
     ENV["STAB_PKG_NAME"] = pakg
@@ -381,8 +381,8 @@ package_stats(pakg :: String) = begin
     # set up and test the package `pakg`
     try
         Pkg.activate(".") # Switch from Stability package-local env to a temp env
-        Pkg.add(pakg)
-        @info "[Stability] [Package: " * pakg * "] Added. Now on to testing"
+        Pkg.add(name=pakg, version=ver)
+        @info "[Stability] [Package: " * pakg * (ver === nothing ? "" : "@$ver") * "] Added. Now on to testing"
         Pkg.test(pakg)
     catch err
         println("Error when running tests for package $(pakg)")

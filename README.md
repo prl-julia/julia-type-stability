@@ -34,7 +34,7 @@ this will create `report.csv` in `./Stability/pkgs`.
 
 ## CLI Interface
 
-Some useful scripts live in `Stability/scripts`. E.g. to process a list of packages, you may use:
+Some useful scripts live in `Stability/scripts`. E.g. to process a list of packages, you can use:
 
 ```
 scripts/proc_packages_parallel.sh top-10.txt
