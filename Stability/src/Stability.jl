@@ -9,7 +9,7 @@ using Pkg
 using CSV
 
 export is_concrete_type, is_grounded_call, all_mis_of_module,
-       FunctionStats, ModuleStats, module_stats, modstats_summary, modstats_table,
+       MethodStats, ModuleStats, module_stats, modstats_summary, modstats_table,
        package_stats, loop_pkgs_stats, cfg_stats,
        show_comma_sep
 
@@ -142,16 +142,16 @@ end
 #  Stats for type stability: Module level
 #
 
-struct CfgStats
+# Statistics gathered per method instance.
+struct MIStats
     st       :: Bool # if the instance is stable
     gd       :: Bool # if the instance is grounded
     gt       :: Int  # number of gotos in the instance
     rt       :: Int  # number of returns in the instance
+    rettype  :: Any  # return type inferred; NOTE: should probably be a Datatype
 end
 
-cfgstats_default() = CfgStats(0,0)
-
-# Stats about control-flow graph of a method
+# Stats about control-flow graph of a method instance
 # Currently, number of gotos, and number of returns
 cfg_stats(code :: CodeInfo) = begin
     gt = 0
@@ -173,9 +173,9 @@ is_goto(::Any) = false
 is_return(e::Expr) = e.head == :return
 is_return(::Any) = false
 
-# Statistics gathered per method. (It's called "function" for histerical reasons.)
+# Statistics gathered per method.
 # Note on "mutable": stats are only mutable during their calculation.
-mutable struct FunctionStats
+mutable struct MethodStats
     occurs   :: Int  # how many instances of the method found
     stable   :: Int  # how many stable instances of the method
     grounded :: Int  # how many grounded instances of the method
@@ -185,14 +185,14 @@ mutable struct FunctionStats
 end
 
 # convenient default constructor
-fstats_default(nospec=0, vararg=0) = FunctionStats(0,0,0,nospec,vararg,0)
+fstats_default(nospec=0, vararg=0) = MethodStats(0,0,0,nospec,vararg,0)
 
 # This is needed for modstats_summary: we smash data about individual methods together
 # and get coarse-grained module stats
 # This has to be clewver: many things can be simply summed, but not all.
 import Base.(+)
-(+)(fs1 :: FunctionStats, fs2 :: FunctionStats) =
-  FunctionStats(
+(+)(fs1 :: MethodStats, fs2 :: MethodStats) =
+  MethodStats(
       fs1.occurs+fs2.occurs,
       fs1.stable+fs2.stable,
       fs1.grounded+fs2.grounded,
@@ -206,11 +206,11 @@ show_comma_sep(xs::Vector) = join(xs, ",")
 
 struct ModuleStats
   modl   :: Module
-  stats  :: Dict{Method, FunctionStats}
-  cfgs   :: Dict{MethodInstance, CfgStats}
+  stats  :: Dict{Method, MethodStats}
+  cfgs   :: Dict{MethodInstance, MIStats}
 end
 
-ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, FunctionStats}(), Dict{Method, CfgStats}())
+ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, MethodStats}(), Dict{Method, MIStats}())
 
 modstats_summary(ms :: ModuleStats) = begin
   fs = foldl((+), values(ms.stats); init=fstats_default())
@@ -254,7 +254,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             end
 
             # handle instance CFG stats
-            res.cfgs[mi] = CfgStats(mi_st, mi_gd, cfg_stats(code)...)
+            res.cfgs[mi] = MIStats(mi_st, mi_gd, cfg_stats(code)..., rettype)
         catch err
             fs.fail += 1
             print(errio, "ERROR: ");
@@ -271,6 +271,7 @@ struct ModuleStatsPerMethodRecord
     occurs   :: Int
     stable   :: Float64
     grounded :: Float64
+    rettypes :: Int
     nospec   :: Int
     vararg   :: Int
     size     :: Int
@@ -281,10 +282,11 @@ end
 struct ModuleStatsPerInstanceRecord
     modl     :: String
     funcname :: String
-    st       :: Bool
-    gd       :: Bool
-    gt       :: Int
-    rt       :: Int
+    stable   :: Bool
+    grounded :: Bool
+    gotos    :: Int
+    returns  :: Int
+    rettypte :: String
     file     :: String
     line     :: Int
 end
@@ -293,6 +295,29 @@ modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
     Tuple{Vector{ModuleStatsPerMethodRecord}, Vector{ModuleStatsPerInstanceRecord}} = begin
         resmeth = []
         resmi = []
+        m2rettype = Dict{Method, Set{String}}()
+        for (mi,cfgst) in ms.cfgs
+            try
+                meth = mi.def
+                modl = "$(meth.module)"
+                mname = "$(meth.name)"
+                msrclen = length(meth.source)
+                rettype = "$(cfgst.rettype)"
+                mfile = "$(meth.file)"
+                mline = meth.line
+                push!(resmi,
+                      ModuleStatsPerInstanceRecord(
+                          modl, mname,
+                          cfgst.st, cfgst.gd,
+                          cfgst.gt, cfgst.rt,
+                          rettype,
+                          mfile, mline))
+                push!(get!(m2rettype, meth, Set{String}()), rettype)
+            catch err
+                println(errio, "ERROR: modstats_table: $(mi)");
+                throw(err)
+            end
+        end
         for (meth,fstats) in ms.stats
             try
                 modl = "$(meth.module)"
@@ -304,30 +329,12 @@ modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
                       ModuleStatsPerMethodRecord(
                           modl, mname, fstats.occurs,
                           fstats.stable/fstats.occurs, fstats.grounded/fstats.occurs,
+                          length(m2rettype[meth]),
                           meth.nospecialize, fstats.vararg,
                           msrclen,
                           mfile, mline))
             catch err
                 println(errio, "ERROR: modstats_table: $(meth)");
-                throw(err)
-            end
-        end
-        for (mi,cfgst) in ms.cfgs
-            try
-                meth = mi.def
-                modl = "$(meth.module)"
-                mname = "$(meth.name)"
-                msrclen = length(meth.source)
-                mfile = "$(meth.file)"
-                mline = meth.line
-                push!(resmi,
-                      ModuleStatsPerInstanceRecord(
-                          modl, mname,
-                          cfgst.st, cfgst.gd,
-                          cfgst.gt, cfgst.rt,
-                          mfile, mline))
-            catch err
-                println(errio, "ERROR: modstats_table: $(mi)");
                 throw(err)
             end
         end
@@ -371,7 +378,7 @@ end
 #   Make sure to run from a reasonable dir, e.g. create a dir for this package yourself
 #   and cd into it before calling.
 #
-package_stats(pakg :: String, ver :: String = nothing) = begin
+package_stats(pakg :: String, ver = nothing) = begin
     start_dir = pwd()
     work_dir  = pwd()
     ENV["STAB_PKG_NAME"] = pakg
