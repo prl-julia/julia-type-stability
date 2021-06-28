@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ -z ${1+x} ]]; then
-    echo "Error: Make sure to pass package name. Bye!"
+    echo "Error: Make sure to pass package name and version. Bye!"
     exit 1;
 fi
 args=( $1 )

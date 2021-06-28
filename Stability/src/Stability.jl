@@ -149,6 +149,8 @@ struct MIStats
     gt       :: Int  # number of gotos in the instance
     rt       :: Int  # number of returns in the instance
     rettype  :: Any  # return type inferred; NOTE: should probably be a Datatype
+    intypes  :: Core.SimpleVector # have to use this b/c that's what we get from
+    # `reconstruct_func_call`; a vector of input types
 end
 
 # Stats about control-flow graph of a method instance
@@ -205,16 +207,16 @@ import Base.(+)
 show_comma_sep(xs::Vector) = join(xs, ",")
 
 struct ModuleStats
-  modl   :: Module
-  stats  :: Dict{Method, MethodStats}
-  cfgs   :: Dict{MethodInstance, MIStats}
+  modl    :: Module
+  mestats :: Dict{Method, MethodStats}
+  mistats :: Dict{MethodInstance, MIStats}
 end
 
 ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, MethodStats}(), Dict{Method, MIStats}())
 
 modstats_summary(ms :: ModuleStats) = begin
-  fs = foldl((+), values(ms.stats); init=fstats_default())
-  [length(ms.stats),fs.occurs,fs.stable,fs.grounded,fs.nospec,fs.vararg,fs.fail]
+  fs = foldl((+), values(ms.mestats); init=fstats_default())
+  [length(ms.mestats),fs.occurs,fs.stable,fs.grounded,fs.nospec,fs.vararg,fs.fail]
 end
 
 module_stats(modl :: Module, errio :: IO = stderr) = begin
@@ -228,13 +230,13 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
 
         is_blocklisted(modl, mi.def.module) && (@debug "alien: $mi.def defined in $mi.def.module"; continue)
 
-        fs = get!(res.stats, mi.def,
+        fs = get!(res.mestats, mi.def,
                   fstats_default(mi.def.nospecialize,
                                  occursin("Vararg","$(mi.def.sig)")))
         try
             call = reconstruct_func_call(mi)
             if call === nothing # this mi is a constructor call - skip
-                delete!(res.stats, mi.def)
+                delete!(res.mestats, mi.def)
                 continue
             end
 
@@ -254,7 +256,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             end
 
             # handle instance CFG stats
-            res.cfgs[mi] = MIStats(mi_st, mi_gd, cfg_stats(code)..., rettype)
+            res.mistats[mi] = MIStats(mi_st, mi_gd, cfg_stats(code)..., rettype, call[2])
         catch err
             fs.fail += 1
             print(errio, "ERROR: ");
@@ -286,39 +288,45 @@ struct ModuleStatsPerInstanceRecord
     grounded :: Bool
     gotos    :: Int
     returns  :: Int
-    rettypte :: String
+    rettype  :: String
+    intypes  :: String
     file     :: String
     line     :: Int
 end
 
-modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
+modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
     Tuple{Vector{ModuleStatsPerMethodRecord}, Vector{ModuleStatsPerInstanceRecord}} = begin
         resmeth = []
         resmi = []
         m2rettype = Dict{Method, Set{String}}()
-        for (mi,cfgst) in ms.cfgs
+        for (mi,cfgst) in ms.mistats
             try
                 meth = mi.def
                 modl = "$(meth.module)"
-                mname = "$(meth.name)"
+                mename = "$(meth.name)"
                 msrclen = length(meth.source)
                 rettype = "$(cfgst.rettype)"
+                intypes = join(cfgst.intypes, ",")
                 mfile = "$(meth.file)"
                 mline = meth.line
                 push!(resmi,
                       ModuleStatsPerInstanceRecord(
-                          modl, mname,
+                          modl, mename,
                           cfgst.st, cfgst.gd,
                           cfgst.gt, cfgst.rt,
-                          rettype,
+                          rettype, intypes,
                           mfile, mline))
                 push!(get!(m2rettype, meth, Set{String}()), rettype)
             catch err
-                println(errio, "ERROR: modstats_table: $(mi)");
-                throw(err)
+                if !endswith(err.msg, "has no field var") # see JuliaLang/julia/issues/38195
+                    println(errio, "ERROR: modstats_table: mi-loop: $(mi)");
+                    throw(err)
+                else
+                    @info "the #38195 bug with $mname"
+                end
             end
         end
-        for (meth,fstats) in ms.stats
+        for (meth,fstats) in ms.mestats
             try
                 modl = "$(meth.module)"
                 mname = "$(meth.name)"
@@ -329,12 +337,14 @@ modstats_table(ms :: ModuleStats, errio = stderr :: IO) ::
                       ModuleStatsPerMethodRecord(
                           modl, mname, fstats.occurs,
                           fstats.stable/fstats.occurs, fstats.grounded/fstats.occurs,
-                          length(m2rettype[meth]),
+                          length(get(m2rettype, meth, Set{String}())), # lookup can fail either
+                            # b/c JuliaLang/julia/issues/38195 or
+                            # type inference failure inside module_stats()
                           meth.nospecialize, fstats.vararg,
                           msrclen,
                           mfile, mline))
             catch err
-                println(errio, "ERROR: modstats_table: $(meth)");
+                println(errio, "ERROR: modstats_table: m-loop: $(meth)");
                 throw(err)
             end
         end
