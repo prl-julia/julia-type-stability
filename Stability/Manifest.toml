@@ -218,9 +218,9 @@ version = "1.3.2"
 
 [[FFTW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "5a0d4b6a22a34d17d53543bd124f4b08ed78e8b0"
+git-tree-sha1 = "3676abafff7e4ff07bbd2c42b3d8201f31653dcc"
 uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
-version = "3.3.9+7"
+version = "3.3.9+8"
 
 [[FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -447,9 +447,9 @@ version = "1.36.0+3"
 
 [[Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "8e924324b2e9275a51407a4e06deb3455b1e359f"
+git-tree-sha1 = "cba7b560fcc00f8cd770fa85a498cbc1d63ff618"
 uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
-version = "1.16.0+7"
+version = "1.16.0+8"
 
 [[Libmount_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -782,11 +782,16 @@ version = "1.0.1"
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
+[[StatsAPI]]
+git-tree-sha1 = "1958272568dc176a1d881acb797beb909c785510"
+uuid = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
+version = "1.0.0"
+
 [[StatsBase]]
-deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics"]
-git-tree-sha1 = "400aa43f7de43aeccc5b2e39a76a79d262202b76"
+deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
+git-tree-sha1 = "2f6792d523d7448bbe2fec99eca9218f06cc746d"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.33.3"
+version = "0.33.8"
 
 [[StatsFuns]]
 deps = ["Rmath", "SpecialFunctions"]
@@ -881,7 +886,7 @@ uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
 version = "2.9.10+3"
 
 [[XSLT_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Libgcrypt_jll", "Pkg", "XML2_jll"]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Libgcrypt_jll", "Libgpg_error_jll", "Pkg", "XML2_jll"]
 git-tree-sha1 = "2b3eac39df218762d2d005702d601cd44c997497"
 uuid = "aed1982a-8fda-507f-9586-7b0439959a61"
 version = "1.1.33+4"

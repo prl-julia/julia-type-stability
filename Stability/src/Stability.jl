@@ -322,7 +322,7 @@ modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
                     println(errio, "ERROR: modstats_table: mi-loop: $(mi)");
                     throw(err)
                 else
-                    @info "the #38195 bug with $mname"
+                    @info "the #38195 bug with $mename"
                 end
             end
         end
@@ -351,6 +351,8 @@ modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
         (resmeth,resmi)
 end
 
+# Filter out some uninteresting data, mostly the standard library
+# (otherwise we would be measuring the standard library all over again)
 is_blocklisted(modl_proccessed :: Module, modl_mi :: Module) = begin
     mmi="$modl_mi"
     mp="$modl_proccessed"
@@ -398,7 +400,11 @@ package_stats(pakg :: String, ver = nothing) = begin
     # set up and test the package `pakg`
     try
         Pkg.activate(".") # Switch from Stability package-local env to a temp env
-        Pkg.add(name=pakg, version=ver)
+        if isfile("Manifest.toml")
+            Pkg.instantiate() # package environment has been setup beforehand
+        else
+            Pkg.add(name=pakg, version=ver)
+        end
         @info "[Stability] [Package: " * pakg * (ver === nothing ? "" : "@$ver") * "] Added. Now on to testing"
         Pkg.test(pakg)
     catch err
