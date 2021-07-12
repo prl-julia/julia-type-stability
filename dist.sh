@@ -10,7 +10,7 @@ mkdir -p $out
 
 cp shell.nix $out/
 cp Stability/pkgs/top-1000-ver.txt $out/top-1000-pkgs.txt
-cp Overview.md $out/README.md
+# cp Overview.md $out/README.md
 
 mkdir -p $out/Stability
 cp -r Stability/scripts $out/Stability/
