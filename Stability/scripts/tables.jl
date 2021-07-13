@@ -32,6 +32,7 @@ println(df1)
 println()
 
 df2 = first(df, 10) 
+sort!(df2)
 println("Table 2")
 println(df2)
 
