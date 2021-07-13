@@ -1,6 +1,6 @@
-# Compute type stability 
-# (instead of printing it, as in @code_arntype@
-# Inspired by julia/stdlib/InteractiveUtils/src/codeview.jl 
+#
+# Package for Type Stability Analysis
+#
 module Stability
 
 using Core: MethodInstance, CodeInstance, CodeInfo
@@ -12,6 +12,10 @@ export is_concrete_type, is_grounded_call, all_mis_of_module,
        MethodStats, ModuleStats, module_stats, modstats_summary, modstats_table,
        package_stats, loop_pkgs_stats, cfg_stats,
        show_comma_sep
+
+#
+# Configuration Parameters
+#
 
 # We do nasty things with Pkg.test
 if get(ENV, "DEV", "NO") != "NO"
@@ -29,7 +33,15 @@ end
 # turn off:
 # juila> ENV["JULIA_DEBUG"] = nothing
 
-# Follows `warntype_type_printer` in the above mentioned file
+#
+# Section: Pure stability analysis
+# inspired by Julia's @code_warn_typed
+#
+
+# Instead of printing concretness of inferred type (as @code_warntype@ does),
+# return a bool
+# Follows `warntype_type_printer` in:
+# julia/stdlib/InteractiveUtils/src/codeview.jl
 is_concrete_type(@nospecialize(ty)) = begin
     if ty isa Type && (!Base.isdispatchelem(ty) || ty == Core.Box)
         if ty isa Union && Base.is_expected_union(ty)
@@ -65,6 +77,7 @@ function run_type_inference(@nospecialize(f), @nospecialize(t))
     ct[1] # we ought to have just one method body, I think
 end
 
+# Accepts inferred method body and checks if every slot in it is concrete
 is_grounded_call(src :: CodeInfo) = begin
     slottypes = src.slottypes
 
@@ -86,7 +99,7 @@ is_grounded_call(src :: CodeInfo) = begin
 end
 
 #
-# MethodInstance-based interface (thanks to MethodAnalysis.jl)
+# Section: MethodInstance-based pure interface (thanks to MethodAnalysis.jl)
 #
 
 # Note [Generic Method Instances]
@@ -98,8 +111,9 @@ end
 is_generic_instance(mi :: MethodInstance) = typeof(mi.specTypes) == UnionAll
 
 # Note [Unknown instances]
-# Some instances we just can't resolve -- for unknown reasons.
+# Some instances we just can't resolve.
 # E.g. In JSON test suite there's a `lower` method that is unknown.
+# This is rare and due to macro magic.
 
 is_known_instance(mi :: MethodInstance) = isdefined(mi.def.module, mi.def.name)
 
@@ -108,7 +122,8 @@ struct StabilityError <: Exception
     sig :: Any
 end
 
-# Result: pair of the function object and the tuple of types of arguments
+# Accepts a method instance as found in Julia VM cache after executing some code.
+# Returns: pair of a function object and a tuple of types of arguments
 #         or nothing if it's constructor call.
 reconstruct_func_call(mi :: MethodInstance) = begin
     sig = Base.unwrap_unionall(mi.specTypes).types
@@ -124,10 +139,8 @@ end
 is_func_type(funcType :: Type{T} where T <: Function) = true
 is_func_type(::Any) = false
 
-# Result: all (compiled) method instances of the given module
+# Returns: all (compiled) method instances of the given module
 # Note: This seems to recourse into things like X.Y (submodules) if modl=X.
-# But it seem to bring even more, so I'm not positive how
-# MethodAnalysis.visit works.
 all_mis_of_module(modl :: Module) = begin
     mis = []
 
@@ -139,7 +152,8 @@ all_mis_of_module(modl :: Module) = begin
 end
 
 #
-#  Stats for type stability: Module level
+#  Section: Stats for type stability, module level
+#  Impure interface
 #
 
 # Statistics gathered per method instance.
@@ -214,11 +228,15 @@ end
 
 ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, MethodStats}(), Dict{Method, MIStats}())
 
+# Generate a summary of stability data in the module: just a fold (+) over stats
+# of individual methods / instances
 modstats_summary(ms :: ModuleStats) = begin
   fs = foldl((+), values(ms.mestats); init=fstats_default())
   [length(ms.mestats),fs.occurs,fs.stable,fs.grounded,fs.nospec,fs.vararg,fs.fail]
 end
 
+# Given a module object after some code of the module has been compiled, compute
+# all stabilty stats for this module
 module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
@@ -267,6 +285,10 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
     res
 end
 
+#
+# Section: Reshape the stats into a tabular form for storing as CSV
+#
+
 struct ModuleStatsPerMethodRecord
     modl     :: String
     funcname :: String
@@ -294,6 +316,7 @@ struct ModuleStatsPerInstanceRecord
     line     :: Int
 end
 
+# Convert stats to vectors of records
 modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
     Tuple{Vector{ModuleStatsPerMethodRecord}, Vector{ModuleStatsPerInstanceRecord}} = begin
         resmeth = []
@@ -367,16 +390,17 @@ is_blocklisted(modl_proccessed :: Module, modl_mi :: Module) = begin
 end
 
 #
-#  Stats for type stability: Package level
+#  Section: Stats for type stability, package level
 #
 
 # package_stats: (pakg: String) -> IO ()
 #
-# Run stability analysis for the package `pakg`.
+# Runs stability analysis for the package `pakg` of version `ver`.
 # Results are stored in the following files of the current directory (see also "Side Effects" below):
 # * stability-stats.out
 # * stability-errors.out
-# * stability-stats.csv
+# * stability-stats-per-method.csv
+# * stability-stats-per-instance.csv
 #
 # Side effects:
 #   In the current directory, creates a temporary environment for this package.
@@ -384,7 +408,7 @@ end
 #
 # Parallel execution:
 #   Possible with the aid of GNU parallel and the tine script in scripts/proc_package_parallel.sh.
-#   It requires a file with a list of packages passed as the single argument.
+#   It requires a file with a list of packages passed as the first argument.
 #
 # REPL:
 #   Make sure to run from a reasonable dir, e.g. create a dir for this package yourself
@@ -431,24 +455,7 @@ package_stats(pakg :: String, ver = nothing) = begin
         eval(Meta.parse(
             open(f-> read(f,String), resf,"r")))
     CSV.write(joinpath(work_dir, "stability-stats-per-instance.csv"), st)
-    @info "[Stability] [Package: " * pakg * "] Results successfully converted to CSV. Bye!"
-end
-
-loop_pkgs_stats(pksg_list_filename::String) = begin
-    pkgs = readlines(pksg_list_filename)
-    if PAR
-        pmap(package_stats, pkgs)
-    else
-        for p in pkgs
-            package_stats(p)
-        end
-    end
-end
-
-add_all_pkgs(pksg_list_filename::String) = begin
-    pkgs = readlines(pksg_list_filename)
-    Pkg.add(pkgs)
+    @info "[Stability] [Package: " * pakg * "] Results successfully converted to CSV. The package is DONE!"
 end
 
 end # module
-
