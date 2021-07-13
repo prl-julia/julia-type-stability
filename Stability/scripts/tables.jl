@@ -13,8 +13,8 @@ getRatio(n, d) = d == 0 ? 0 : n / d
 df[!, "Inst/Meth"]    = round.(getRatio.(df.Instances, df.Methods), digits=1)
 
 df[!, "Varargs (%)"]  = round.(Int, getRatio.(df.vararg,   df.Methods) .* 100)
-df[!, "Stable (%)"]   = round.(Int, getRatio.(df.stable,   df.Methods) .* 100)
-df[!, "Grounded (%)"] = round.(Int, getRatio.(df.grounded, df.Methods) .* 100)
+df[!, "Stable (%)"]   = round.(Int, getRatio.(df.stable,   df.Instances) .* 100)
+df[!, "Grounded (%)"] = round.(Int, getRatio.(df.grounded, df.Instances) .* 100)
 
 select!(df, Not([:stable ,:grounded, :nospec, :vararg, :Fail]))
 
