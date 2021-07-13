@@ -15,5 +15,7 @@ if [[ $# -eq 0 ]] ; then
     find . -maxdepth 2 -name stability-summary.out -exec cat {} + | sort | sed '1i package,Methods,Instances,stable,grounded,nospec,vararg,Fail' > report.csv
 else
     res=$(report $1)
-    echo "$res" | sed '1i package,Methods,Instances,stable,grounded,nospec,vararg,Fail' > report.csv
+    lines=$(echo "$res" | wc -l | awk '{print $1}')
+    res2=$(echo "$res" | head -n ${2:-$lines})
+    echo "$res2" | sed '1i package,Methods,Instances,stable,grounded,nospec,vararg,Fail' > report.csv
 fi
