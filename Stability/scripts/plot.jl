@@ -17,7 +17,10 @@ metrics = Dict(
 
 ENV["GKSwstype"] = "nul"  # need to run headless (no graphics)
 
-using StatsPlots
+OUTPUT_FORMAT = "pdf"     # default, but may end up broken in some PDF viewers
+                #"svg"    # alternative that is more portable
+
+using Plots, Plots.PlotMeasures, StatsPlots
 
 # Plot a 2D histogram with OY = a stability metrics (stable or grounded)
 # and OX some other label in the dataframe.
@@ -42,6 +45,8 @@ plot_2d_histogram(pkg :: AbstractString; ox :: Symbol = :size, oy :: Symbol = :s
         cb = true,
         xtickfont=13,
         ytickfont=13,
+        left_margin = 5px,
+        right_margin = 20px,
         nbins=(20,10),
         xlim=[mi,ma+ma/20],
         ylim=[0,1.2]) # OX scale is adaptive but OY is always 0 to 1 --
@@ -59,7 +64,7 @@ plot_pkg_by_granularity(pkg :: AbstractString, gran :: String) = begin
             @info "About to plot $pkg: $(ox) by $(oy)"
             plot_2d_histogram(pkg;ox=ox,oy=oy,granularity=gran)
             mkpath("$(pkg)/figs")
-            savefig("$(pkg)/figs/$(pkg)-$(ox)-vs-$(oy).pdf")
+            savefig("$(pkg)/figs/$(pkg)-$(ox)-vs-$(oy).$(OUTPUT_FORMAT)")
         end
     end
 end
