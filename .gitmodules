@@ -1,0 +1,3 @@
+[submodule "pkgs"]
+	path = pkgs
+	url = https://github.com/prl-julia/julia-type-stability-pkgs.git
