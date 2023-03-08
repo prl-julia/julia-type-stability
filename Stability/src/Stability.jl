@@ -274,7 +274,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             end
 
             # handle instance CFG stats
-            res.mistats[mi] = MIStats(mi_st, mi_gd, cfg_stats(code)..., rettype, call[2])
+            res.mistats[mi] = MIStats(mi_st, mi_gd, cfg_stats(code)..., rettype, call[2] #= input types =#)
         catch err
             fs.fail += 1
             print(errio, "ERROR: ");
@@ -416,6 +416,15 @@ macro myinfo(pkgtag, msg)
     esc(:( @info ("[Stability] [Package: " * $pkgtag * "] " * $msg ) ))
 end
 
+txtToCsv(work_dir :: String, basename :: String) = begin
+    resf = joinpath(work_dir, "$basename.txt")
+    isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
+    st =
+        eval(Meta.parse(
+            open(f-> read(f,String), resf,"r")))
+    CSV.write(joinpath(work_dir, "$basename.csv"), st)
+end
+
 #
 #  Section: Stats for type stability, package level
 #
@@ -489,19 +498,8 @@ package_stats(pakg :: String, ver = nothing) = begin
     #
     # Write down the results
     #
-    resf = joinpath(work_dir, "stability-stats-per-method.txt")
-    isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
-    st =
-        eval(Meta.parse(
-            open(f-> read(f,String), resf,"r")))
-    CSV.write(joinpath(work_dir, "stability-stats-per-method.csv"), st)
-
-    resf = joinpath(work_dir, "stability-stats-per-instance.txt")
-    isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
-    st =
-        eval(Meta.parse(
-            open(f-> read(f,String), resf,"r")))
-    CSV.write(joinpath(work_dir, "stability-stats-per-instance.csv"), st)
+    txtToCsv(work_dir, "stability-stats-per-method")
+    txtToCsv(work_dir, "stability-stats-per-instance")
     @myinfo pkgtag "Results successfully converted to CSV. The package is DONE!"
 end
 
