@@ -1,9 +1,18 @@
+#############################################
 #
 #  Stats for type stability, module level
 #
+#############################################
 
+import Base.@kwdef
+include("equality.jl")
+
+# -------------------------------------------
+#
 # Statistics gathered per method instance.
-struct MIStats
+#
+# -------------------------------------------
+@kwdef struct MIStats
     st       :: Bool # if the instance is stable
     gd       :: Bool # if the instance is grounded
     gt       :: Int  # number of gotos in the instance
@@ -12,6 +21,8 @@ struct MIStats
     intypes  :: Core.SimpleVector # have to use this b/c that's what we get from
     # `reconstruct_func_call`; a vector of input types
 end
+
+@deriveEq(MIStats)
 
 # Stats about control-flow graph of a method instance
 # Currently, number of gotos, and number of returns
@@ -35,9 +46,16 @@ is_goto(::Any) = false
 is_return(e::Expr) = e.head == :return
 is_return(::Any) = false
 
+
+# -------------------------------------------
+#
+#
 # Statistics gathered per method.
+#
+# -------------------------------------------
+
 # Note on "mutable": stats are only mutable during their calculation.
-mutable struct MethodStats
+@kwdef mutable struct MethodStats
     occurs   :: Int  # how many instances of the method found
     stable   :: Int  # how many stable instances of the method
     grounded :: Int  # how many grounded instances of the method
@@ -45,6 +63,8 @@ mutable struct MethodStats
     vararg   :: Int  # if the method is a varags method (0/1)
     fail     :: Int  # how many times fail to detect stability of an instance (cf. Issues #7, #8)
 end
+
+@deriveEq(MethodStats)
 
 # convenient default constructor
 fstats_default(nospec=0, vararg=0) = MethodStats(0,0,0,nospec,vararg,0)
@@ -66,13 +86,22 @@ import Base.(+)
 # This is needed for modstats_summary
 show_comma_sep(xs::Vector) = join(xs, ",")
 
-struct ModuleStats
+
+# -------------------------------------------
+#
+# Statistics gathered per module.
+#
+# -------------------------------------------
+
+@kwdef struct ModuleStats
   modl    :: Module
   mestats :: Dict{Method, MethodStats}
   mistats :: Dict{MethodInstance, MIStats}
 end
 
 ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, MethodStats}(), Dict{Method, MIStats}())
+
+@deriveEq(ModuleStats)
 
 # Generate a summary of stability data in the module: just a fold (+) over stats
 # of individual methods / instances
@@ -81,8 +110,25 @@ modstats_summary(ms :: ModuleStats) = begin
   [length(ms.mestats),fs.occurs,fs.stable,fs.grounded,fs.nospec,fs.vararg,fs.fail]
 end
 
-# Given a module object after some code of the module has been compiled, compute
-# all stabilty stats for this module
+
+# ----------------------------------------------------------
+#
+# Entry point to the whole file: compute stats over a module
+#
+# ----------------------------------------------------------
+
+#
+# module_stats :: (Module, IO) -> ModuleStats
+#
+# Given a module object compute stabilty stats for this module.
+#
+# Assumption:
+#   All code of interest from the module has been compiled. In plain terms, you need to call a method
+#   at least once to have some data about it.
+#
+# Normally, you would have a package X exporting main module also called X.
+# You run a test suite of the corresponding package and then call `module_stats(X)`.
+#
 module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
