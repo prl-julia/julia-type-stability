@@ -9,7 +9,8 @@ using Pkg
 using CSV
 
 export is_concrete_type, is_grounded_call, all_mis_of_module,
-       MethodStats, ModuleStats, module_stats, modstats_summary, modstats_table,
+       MIStats, MethodStats, ModuleStats,
+       module_stats, modstats_summary, modstats_table,
        package_stats, cfg_stats,
        show_comma_sep
 
