@@ -37,7 +37,7 @@ end
 include("MethodAnalysis.jl")
 include("Stats.jl")
 include("CSVize.jl")
-include("Aux.jl")
+include("Utils.jl")
 
 #
 #  The main entry point for package-level analysis
