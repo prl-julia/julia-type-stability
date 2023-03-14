@@ -1,6 +1,7 @@
 #
-# Pure stability analysis
-# inspired by Julia's @code_warn_typed
+# Pure method stability analysis
+#
+# Inspired by Julia's @code_warntyped, so uses Julia's own type inference
 #
 
 # Instead of printing concretness of inferred type (as @code_warntype@ does),

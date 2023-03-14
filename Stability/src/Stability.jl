@@ -1,5 +1,5 @@
 #
-# Package for Type Stability Analysis
+# Package for Type Stability analysis of Julia packages
 #
 module Stability
 
@@ -33,7 +33,7 @@ end
 # turn off:
 # juila> ENV["JULIA_DEBUG"] = nothing
 
-include("Analysis.jl")
+include("MethodAnalysis.jl")
 include("Stats.jl")
 include("CSVize.jl")
 include("Aux.jl")
