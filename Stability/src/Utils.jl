@@ -46,7 +46,7 @@ end
 
 txtToCsv(work_dir :: String, basename :: String) = begin
     resf = joinpath(work_dir, "$basename.txt")
-    isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
+    isfile(resf) || (throw(ErrorException("Stability analysis failed to produce output $resf")))
     st =
         eval(Meta.parse(
             open(f-> read(f,String), resf,"r")))

@@ -114,6 +114,7 @@ package_stats(pakg :: String, ver = nothing) = begin
     #
     txtToCsv(work_dir, "stability-stats-per-method")
     txtToCsv(work_dir, "stability-stats-per-instance")
+    txtToCsv(work_dir, "stability-stats-intypes")
     @myinfo pkgtag "Results successfully converted to CSV. The package is DONE!"
 end
 

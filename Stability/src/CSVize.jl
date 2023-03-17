@@ -29,11 +29,25 @@ struct ModuleStatsPerInstanceRecord
     line     :: Int
 end
 
-# Convert stats to vectors of records
+struct ModuleStatsInTypeRecord
+    modl     :: String
+    tyname   :: String
+    occurs   :: Int
+end
+
+#
+# Convert stats dicitonaries to vectors of records
+#
 modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
-    Tuple{Vector{ModuleStatsPerMethodRecord}, Vector{ModuleStatsPerInstanceRecord}} = begin
+    Tuple{
+        Vector{ModuleStatsPerMethodRecord},
+        Vector{ModuleStatsPerInstanceRecord},
+        Vector{ModuleStatsInTypeRecord}} = begin
+
         resmeth = []
         resmi = []
+        resty = []
+
         m2rettype = Dict{Method, Set{String}}()
         for (mi,cfgst) in ms.mistats
             try
@@ -84,5 +98,16 @@ modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
                 throw(err)
             end
         end
-        (resmeth,resmi)
+        for (ty,tystat) in ms.tystats
+            try
+                modl = "$(tystat.modl)"
+                tyname = "$(ty)"
+                push!(resty,
+                      ModuleStatsInTypeRecord(modl, tyname, tystat.occurs))
+            catch err
+                println(errio, "ERROR: modstats_table: ty-loop: $err");
+                throw(err)
+            end
+        end
+        (resmeth,resmi,resty)
 end
