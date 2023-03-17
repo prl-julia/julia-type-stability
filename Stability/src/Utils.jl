@@ -52,3 +52,13 @@ txtToCsv(work_dir :: String, basename :: String) = begin
             open(f-> read(f,String), resf,"r")))
     CSV.write(joinpath(work_dir, "$basename.csv"), st)
 end
+
+moduleChainOfType(@nospecialize(ty)) :: String = begin
+    mod=parentmodule(ty)
+    res="$mod"
+    while parentmodule(ty) != mod
+        mod = parentmodule(mod)
+        res = "$mod." * res
+    end
+    res
+end

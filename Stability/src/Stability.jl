@@ -52,6 +52,7 @@ include("Utils.jl")
 #   * stability-errors.out
 #   * stability-stats-per-method.csv
 #   * stability-stats-per-instance.csv
+#   * stability-stats-intypes.csv
 #   * $pakg-version.txt (version stamp for future reference)
 #
 # Setting a package version:

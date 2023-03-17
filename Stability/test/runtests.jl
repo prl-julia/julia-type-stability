@@ -22,6 +22,6 @@ finst=fmeth.specializations[1]
     ModuleStats(M,
                 Dict(fmeth=>MethodStats(; occurs=1, stable=1, grounded=1, nospec=0, vararg=0, fail=0)),
                 Dict(finst=>MIStats(; st=1, gd=1, gt=0, rt=0, rettype=Int64, intypes=Core.svec(Int64))),
-                Dict(Int64=>InTypeStats("Main.M", 1)),
+                Dict(Int64=>InTypeStats("Core", 1)),
                 )
 end

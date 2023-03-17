@@ -99,6 +99,7 @@ show_comma_sep(xs::Vector) = join(xs, ",")
 end
 
 InTypeStats(modl :: Module) = InTypeStats("$modl", 0)
+InTypeStats(modl :: String) = InTypeStats(modl, 0)
 
 @deriveEq(InTypeStats)
 
@@ -195,9 +196,10 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             # Collect intypes
             intypes = Base.unwrap_unionall(mi.specTypes).types[2:end]
             for ty in intypes
+                tymodl = moduleChainOfType(ty)
                 tystat = get!(res.tystats,
                             ty,
-                            InTypeStats(mi.def.module))
+                            InTypeStats(tymodl))
                 tystat.occurs += 1
             end
         catch err
