@@ -49,7 +49,6 @@ is_return(::Any) = false
 
 # -------------------------------------------
 #
-#
 # Statistics gathered per method.
 #
 # -------------------------------------------
@@ -87,6 +86,23 @@ import Base.(+)
 show_comma_sep(xs::Vector) = join(xs, ",")
 
 
+# --------------------------------------------------------
+#
+# Statistics for all types occured during instantiations.
+#
+# --------------------------------------------------------
+
+# Note on "mutable": stats are only mutable during their calculation.
+@kwdef mutable struct InTypeStats
+    modl   :: String
+    occurs :: Int
+end
+
+InTypeStats(modl :: Module) = InTypeStats("$modl", 0)
+InTypeStats(modl :: String) = InTypeStats(modl, 0)
+
+@deriveEq(InTypeStats)
+
 # -------------------------------------------
 #
 # Statistics gathered per module.
@@ -97,9 +113,15 @@ show_comma_sep(xs::Vector) = join(xs, ",")
   modl    :: Module
   mestats :: Dict{Method, MethodStats}
   mistats :: Dict{MethodInstance, MIStats}
+  tystats :: Dict{Any, InTypeStats}
 end
 
-ModuleStats(modl :: Module) = ModuleStats(modl, Dict{Method, MethodStats}(), Dict{Method, MIStats}())
+ModuleStats(modl :: Module) = ModuleStats(
+    modl,
+    Dict{Method, MethodStats}(),
+    Dict{Method, MIStats}(),
+    Dict{Any, InTypeStats}()
+)
 
 @deriveEq(ModuleStats)
 
@@ -133,17 +155,20 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     for mi in mis
+
+        # Special cases: @generated, blocklisted
         if isdefined(mi.def, :generator) # can't handle @generated functions, Issue #11
             @debug "GENERATED $(mi)"
             continue
         end
-
         is_blocklisted(modl, mi.def.module) && (@debug "alien: $mi.def defined in $mi.def.module"; continue)
 
+        # Lookup method stats object for this `mi`
         fs = get!(res.mestats, mi.def,
                   fstats_default(mi.def.nospecialize,
                                  occursin("Vararg","$(mi.def.sig)")))
         try
+            # Get code of the `mi` for later analysis
             call = reconstruct_func_call(mi)
             if call === nothing # this mi is a constructor call - skip
                 delete!(res.mestats, mi.def)
@@ -152,7 +177,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
 
             fs.occurs += 1
 
-            # handle stability/groundedness
+            # Check stability/groundedness of the code
             mi_st = false
             mi_gd = false
             (code,rettype) = run_type_inference(call...);
@@ -165,8 +190,18 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
                 end
             end
 
-            # handle instance CFG stats
+            # Handle instance CFG stats
             res.mistats[mi] = MIStats(mi_st, mi_gd, cfg_stats(code)..., rettype, call[2] #= input types =#)
+
+            # Collect intypes
+            intypes = Base.unwrap_unionall(mi.specTypes).types[2:end]
+            for ty in intypes
+                tymodl = moduleChainOfType(ty)
+                tystat = get!(res.tystats,
+                            ty,
+                            InTypeStats(tymodl))
+                tystat.occurs += 1
+            end
         catch err
             fs.fail += 1
             print(errio, "ERROR: ");

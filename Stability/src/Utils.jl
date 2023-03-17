@@ -46,9 +46,19 @@ end
 
 txtToCsv(work_dir :: String, basename :: String) = begin
     resf = joinpath(work_dir, "$basename.txt")
-    isfile(resf) || (@error "Stability analysis failed to produce output $resf"; return)
+    isfile(resf) || (throw(ErrorException("Stability analysis failed to produce output $resf")))
     st =
         eval(Meta.parse(
             open(f-> read(f,String), resf,"r")))
     CSV.write(joinpath(work_dir, "$basename.csv"), st)
+end
+
+moduleChainOfType(@nospecialize(ty)) :: String = begin
+    mod=parentmodule(ty)
+    res="$mod"
+    while parentmodule(ty) != mod
+        mod = parentmodule(mod)
+        res = "$mod." * res
+    end
+    res
 end

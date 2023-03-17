@@ -9,7 +9,7 @@ using Pkg
 using CSV
 
 export is_concrete_type, is_grounded_call, all_mis_of_module,
-       MIStats, MethodStats, ModuleStats,
+       MIStats, MethodStats, InTypeStats, ModuleStats,
        module_stats, modstats_summary, modstats_table,
        package_stats, cfg_stats,
        show_comma_sep
@@ -52,6 +52,7 @@ include("Utils.jl")
 #   * stability-errors.out
 #   * stability-stats-per-method.csv
 #   * stability-stats-per-instance.csv
+#   * stability-stats-intypes.csv
 #   * $pakg-version.txt (version stamp for future reference)
 #
 # Setting a package version:
@@ -114,6 +115,7 @@ package_stats(pakg :: String, ver = nothing) = begin
     #
     txtToCsv(work_dir, "stability-stats-per-method")
     txtToCsv(work_dir, "stability-stats-per-instance")
+    txtToCsv(work_dir, "stability-stats-intypes")
     @myinfo pkgtag "Results successfully converted to CSV. The package is DONE!"
 end
 
