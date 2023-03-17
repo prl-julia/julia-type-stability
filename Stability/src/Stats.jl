@@ -86,11 +86,11 @@ import Base.(+)
 show_comma_sep(xs::Vector) = join(xs, ",")
 
 
-# -------------------------------------------
+# --------------------------------------------------------
 #
 # Statistics for all types occured during instantiations.
 #
-# -------------------------------------------
+# --------------------------------------------------------
 
 # Note on "mutable": stats are only mutable during their calculation.
 @kwdef mutable struct InTypeStats
