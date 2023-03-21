@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 #
 # Process/validate arguments:
@@ -44,7 +43,12 @@ pushd $pkg
 # Call Julia with a timeout
 #
 STABILITY_HOME="$DIR/../"
-DEV=YES JULIA_DEPOT_PATH="`pwd`/depot" STABILITY_HOME="$STABILITY_HOME" timeout 2400 julia -L "$STABILITY_HOME/startup.jl" -e "$PACKAGE_STATS_CALL"
+out="$(DEV=YES JULIA_DEPOT_PATH="$PWD/depot" STABILITY_HOME="$STABILITY_HOME" timeout 2400 julia -L "$STABILITY_HOME/startup.jl" -e "$PACKAGE_STATS_CALL" 2>&1)"
+retcode=$?
+echo $retcode > test-result.txt
+if [ $retcode -ne 0 ]; then
+    echo "$out" > test-out.txt
+fi
 popd
 
 # ATTENTION
