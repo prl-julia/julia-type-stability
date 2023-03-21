@@ -43,10 +43,17 @@ pushd $pkg
 # Call Julia with a timeout
 #
 STABILITY_HOME="$DIR/../"
-out="$(DEV=YES JULIA_DEPOT_PATH="$PWD/depot" STABILITY_HOME="$STABILITY_HOME" timeout 2400 julia -L "$STABILITY_HOME/startup.jl" -e "$PACKAGE_STATS_CALL" 2>&1)"
-retcode=$?
-echo $retcode > test-result.txt
-if [ $retcode -ne 0 ]; then
+
+# NOTE: Below the main command is spelled twice on every branch of if -- this is unfortunate
+#       Make sure to edit both instances if you want to update the command
+if [ -z "${BATCH}" ]; then
+    DEV=YES JULIA_DEPOT_PATH="$PWD/depot" STABILITY_HOME="$STABILITY_HOME" timeout 2400 julia -L "$STABILITY_HOME/startup.jl" -e "$PACKAGE_STATS_CALL" 2>&1
+    retcode=$?
+    echo "$retcode" > test-result.txt
+else
+    out="$(DEV=YES JULIA_DEPOT_PATH="$PWD/depot" STABILITY_HOME="$STABILITY_HOME" timeout 2400 julia -L "$STABILITY_HOME/startup.jl" -e "$PACKAGE_STATS_CALL" 2>&1)"
+    retcode=$?
+    echo "$retcode" > test-result.txt
     echo "$out" > test-out.txt
 fi
 popd

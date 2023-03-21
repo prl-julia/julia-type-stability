@@ -18,5 +18,5 @@ set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 lines=$(wc -l $1 | awk '{print $1}')
-head -n ${2:-$lines} $1 | parallel "$DIR/proc_package.sh"
+head -n ${2:-$lines} $1 | BATCH=1 parallel "$DIR/proc_package.sh"
 $DIR/pkgs-report.sh $1 ${2:-$lines}
