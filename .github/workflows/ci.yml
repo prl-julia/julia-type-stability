@@ -23,5 +23,4 @@ jobs:
           project: Stability
       - uses: julia-actions/julia-runtest@v1
         with:
-          annotate: true
           project: Stability
