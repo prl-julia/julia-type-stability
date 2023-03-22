@@ -7,7 +7,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: ['1', 'nightly']
+        julia-version: ['1.8'] # NOTE: we'd like but can't do 'nightly' atm due to
+        # https://github.com/JuliaLang/julia/pull/49071
         julia-arch: [x64]
         os: [ubuntu-latest, windows-latest, macOS-latest]
 
