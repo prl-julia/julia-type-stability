@@ -13,7 +13,7 @@ end
 # we won't see any stats:
 @test module_stats(M) == ModuleStats(M)
 
-M.f(1) # compile
+M.f(1,2) # compile
 
 fmeth=methods(M.f)[1]
 finst=fmeth.specializations[1]
