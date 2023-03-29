@@ -20,6 +20,7 @@ elif ! [ -z ${2+x} ]; then
 else
     PACKAGE_STATS_CALL="package_stats(\"$pkg\")"
 fi
+PACKAGE_STATS_CALL="using Pkg; Pkg.instantiate(); using Stability; ${PACKAGE_STATS_CALL}"
 
 # Record current directory. Note: don't move around or it'll stop working!
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -47,15 +48,16 @@ STABILITY_HOME="$DIR/../"
 # NOTE: Below the main command is spelled twice on every branch of if -- this is unfortunate
 #       Make sure to edit both instances if you want to update the command
 if [ -z "${BATCH}" ]; then
-    DEV=YES JULIA_DEPOT_PATH="$PWD/depot" STABILITY_HOME="$STABILITY_HOME" timeout 2400 julia -L "$STABILITY_HOME/startup.jl" -e "$PACKAGE_STATS_CALL" 2>&1
+    DEV=YES JULIA_DEPOT_PATH="$PWD/depot" timeout 2400 julia --project="$STABILITY_HOME" -e "$PACKAGE_STATS_CALL" 2>&1
     retcode=$?
     echo "$retcode" > test-result.txt
 else
-    out="$(DEV=YES JULIA_DEPOT_PATH="$PWD/depot" STABILITY_HOME="$STABILITY_HOME" timeout 2400 julia -L "$STABILITY_HOME/startup.jl" -e "$PACKAGE_STATS_CALL" 2>&1)"
+    out="$(DEV=YES JULIA_DEPOT_PATH="$PWD/depot" timeout 2400 julia --project="$STABILITY_HOME" -e "$PACKAGE_STATS_CALL" 2>&1)"
     retcode=$?
     echo "$retcode" > test-result.txt
     echo "$out" > test-out.txt
 fi
+
 popd
 
 # ATTENTION
