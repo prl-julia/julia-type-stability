@@ -23,12 +23,6 @@ if get(ENV, "DEV", "NO") != "NO"
   include("pkg-test-override.jl")
 end
 
-# Wheather we do parallel processing of packages
-PAR = get(ENV, "PAR", "NO") != "NO"
-if PAR
-    using Distributed
-end
-
 # turn on debug info:
 # julia> ENV["JULIA_DEBUG"] = Main
 # turn off:
