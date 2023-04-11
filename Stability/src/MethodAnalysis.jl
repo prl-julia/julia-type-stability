@@ -69,7 +69,7 @@ end
 #
 
 # Note [Generic Method Instances]
-# We don't quite understand hwo to process generic method instances (cf. issue #2)
+# We don't quite understand how to process generic method instances (cf. issue #2)
 # We used to detect them, count, but don't test for stability.
 # Currently, we use Base.unwrap_unionall and the test just works (yes, for types
 # with free type variables). This still requires more thinking.
@@ -88,12 +88,33 @@ struct StabilityError <: Exception
     sig :: Any
 end
 
-# Accepts a method instance as found in Julia VM cache after executing some code.
-# Returns: pair of a function object and a tuple of types of arguments
+# reconstruct_func_call : MethodInstance -> IO (Union{ (Method, [Type]), Nothing })
+#
+# What does Julia do about (top-level) function calls like `abc(1,xyz)`?
+# 1. Identifiy types of the inputs (1 :: Int, xyz :: Blah)
+# 2. Dispatch: figure out which implementation (aka method) of `abc` will be used.
+# 3. Compile the method (2) using the input types (1) to get a "method instance".
+# 
+# `reconstruct_func_call` does the reverse transformation:
+# Accepts a method instance (3) as found in Julia VM cache after executing some code.
+# Returns: pair of a method object (2) and a tuple of types of arguments (1)
 #         or nothing if it's constructor call.
+#
+# ### Why IO?
+# 
+# The analysis here is pure. The only reason we add IO is a sheaky hack we implement
+# to trace suspicous cases of inputs that we don't understand very well. In particular,
+# generic signatures of method instances. In theory they shouldn't appear but in
+# practise they do. So we log then in a file generic-instances.txt
+#
 reconstruct_func_call(mi :: MethodInstance) = begin
-    sig = Base.unwrap_unionall(mi.specTypes).types
-    if is_func_type(sig[1])
+    unwrp = Base.unwrap_unionall(mi.specTypes)
+    unwrp != mi.specTypes && (@warn "Generic method instance found: $mi";
+        run(pipeline(`$mi.specTypes`, stdout="generic-instances.txt")))
+    sig = unwrp.types
+    # @show mi.specTypes # -- tuple
+    # @show sig          # -- svec
+    if is_func_type(sig[1]) && (unwrp == mi.specTypes)
         (sig[1].instance, sig[2:end])
     else
         nothing

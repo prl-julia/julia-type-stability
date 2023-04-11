@@ -202,7 +202,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             #                  we now have them separately one by one, see Step 3 below
 
             # Step 3: Collect intypes
-            intypes = Base.unwrap_unionall(mi.specTypes).types[2:end]
+            intypes = call[2]
             for ty in intypes
                 tymodl = moduleChainOfType(ty)
                 tystat = get!(res.tystats,
