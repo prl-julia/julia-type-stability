@@ -156,6 +156,12 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
     mis = all_mis_of_module(modl)
     for mi in mis
 
+        # Plan: for every method instance `mi` need to update every of the three fields
+        #       in `res` (ModuleStats): 
+        #       step 1) method stats (`res.mestats`)
+        #       step 2) instance stats (`res.mistats`)
+        #       step 3) input types (`res.tystats`)
+
         # Special cases: @generated, blocklisted
         if isdefined(mi.def, :generator) # can't handle @generated functions, Issue #11
             @debug "GENERATED $(mi)"
@@ -163,8 +169,8 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
         end
         is_blocklisted(modl, mi.def.module) && (@debug "alien: $mi.def defined in $mi.def.module"; continue)
 
-        # Lookup method stats object for this `mi`
-        fs = get!(res.mestats, mi.def,
+        # Starting step 1: Lookup method stats object for this `mi`
+        mest = get!(res.mestats, mi.def,
                   fstats_default(mi.def.nospecialize,
                                  occursin("Vararg","$(mi.def.sig)")))
         try
@@ -175,25 +181,27 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
                 continue
             end
 
-            fs.occurs += 1
+            mest.occurs += 1
 
-            # Check stability/groundedness of the code
+            # Finishing step 1 and starting step 2: Check stability/groundedness of the code
             mi_st = false
             mi_gd = false
             (code,rettype) = run_type_inference(call...);
             if is_concrete_type(rettype)
-                fs.stable += 1
+                mest.stable += 1
                 mi_st = true
                 if is_grounded_call(code)
-                    fs.grounded += 1
+                    mest.grounded += 1
                     mi_gd = true
                 end
             end
 
-            # Handle instance CFG stats
+            # Finishing step 2: all that is left is to handle instance CFG stats
             res.mistats[mi] = MIStats(mi_st, mi_gd, cfg_stats(code)..., rettype, call[2] #= input types =#)
+            # Note on intypes: historically, they lived in MIStats, but for more precise analysis
+            #                  we now have them separately one by one, see Step 3 below
 
-            # Collect intypes
+            # Step 3: Collect intypes
             intypes = Base.unwrap_unionall(mi.specTypes).types[2:end]
             for ty in intypes
                 tymodl = moduleChainOfType(ty)
@@ -203,7 +211,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
                 tystat.occurs += 1
             end
         catch err
-            fs.fail += 1
+            mest.fail += 1
             print(errio, "ERROR: ");
             showerror(errio, err, stacktrace(catch_backtrace()))
             println(errio)
