@@ -154,6 +154,7 @@ end
 module_stats(modl :: Module, errio :: IO = stderr) = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
+    generic_types = 0
     for mi in mis
 
         # Plan: for every method instance `mi` need to update every of the three fields
@@ -176,7 +177,8 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
         try
             # Get code of the `mi` for later analysis
             call = reconstruct_func_call(mi)
-            if call === nothing # this mi is a constructor call - skip
+            if call === nothing # this mi is a constructor call or it's generic - skip;
+                                # for generics, see a separate file: generic-instances.txt
                 delete!(res.mestats, mi.def)
                 continue
             end
@@ -204,6 +206,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             # Step 3: Collect intypes
             intypes = call[2]
             for ty in intypes
+                ty isa UnionAll && (generic_types += 1; continue)
                 tymodl = moduleChainOfType(ty)
                 tystat = get!(res.tystats,
                             ty,
@@ -217,5 +220,6 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             println(errio)
         end
     end
+    open(f->write(f,generic_types), "generic-types-count.txt", "w")
     res
 end
