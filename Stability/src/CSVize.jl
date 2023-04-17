@@ -30,6 +30,7 @@ struct ModuleStatsPerInstanceRecord
 end
 
 struct ModuleStatsInTypeRecord
+    pack     :: String
     modl     :: String
     tyname   :: String
     occurs   :: Int
@@ -100,10 +101,11 @@ modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
         end
         for (ty,tystat) in ms.tystats
             try
+                pack = tystat.pack
                 modl = "$(tystat.modl)"
                 tyname = "$(ty)"
                 push!(resty,
-                      ModuleStatsInTypeRecord(modl, tyname, tystat.occurs))
+                      ModuleStatsInTypeRecord(pack, modl, tyname, tystat.occurs))
             catch err
                 println(errio, "ERROR: modstats_table: ty-loop: $err");
                 throw(err)

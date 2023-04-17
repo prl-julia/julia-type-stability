@@ -19,8 +19,8 @@ main() = begin
         @info "Processing " package
         resdf = vcat(resdf, CSV.read(in, DataFrame))
         resdf = @from i in resdf begin
-            @group i.occurs by i.modl, i.tyname into g
-            @select {modl=key(g)[1], tyname=key(g)[2], occurs=sum(g)}
+            @group i.occurs by i.pack, i.modl, i.tyname into g
+            @select {pack=key(g)[1], modl=key(g)[2], tyname=key(g)[3], occurs=sum(g)}
             @collect DataFrame
         end
     end

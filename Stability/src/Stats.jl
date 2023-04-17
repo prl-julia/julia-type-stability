@@ -94,12 +94,13 @@ show_comma_sep(xs::Vector) = join(xs, ",")
 
 # Note on "mutable": stats are only mutable during their calculation.
 @kwdef mutable struct InTypeStats
+    pack   :: String
     modl   :: String
     occurs :: Int
 end
 
-InTypeStats(modl :: Module) = InTypeStats("$modl", 0)
-InTypeStats(modl :: String) = InTypeStats(modl, 0)
+InTypeStats(pack :: String, modl :: Module) = InTypeStats(pack, "$modl", 0)
+InTypeStats(pack :: String, modl :: String) = InTypeStats(pack, modl, 0)
 
 @deriveEq(InTypeStats)
 
@@ -210,7 +211,7 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
                 tymodl = moduleChainOfType(ty)
                 tystat = get!(res.tystats,
                             ty,
-                            InTypeStats(tymodl))
+                            InTypeStats("$modl", tymodl))
                 tystat.occurs += 1
             end
         catch err
