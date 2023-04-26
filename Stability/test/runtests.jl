@@ -20,8 +20,17 @@ finst=fmeth.specializations[1]
 
 @test module_stats(M) ==
     ModuleStats(M,
-                Dict(fmeth=>MethodStats(; occurs=1, stable=1, grounded=1, nospec=0, vararg=0, fail=0)),
-                Dict(finst=>MIStats(; st=1, gd=1, gt=0, rt=0, rettype=Int64, intypes=Core.svec(Int64))),
-                Dict(Int64=>InTypeStats("Main.M", "Core", 1)),
-                )
+            Dict(fmeth => MethodStats(; occurs=1, stable=1, grounded=1, nospec=0, vararg=0, fail=0)),
+            Dict(finst => MIStats(; st=1, gd=1, gt=0, rt=0, rettype=Int64, intypes=Core.svec(Int64))),
+            Dict(Int64 => InTypeStats("Main.M", "Core", 1, 0)),
+    )
+end
+
+@testset "Utils                                 " begin
+    @test Stability.slice_parametric_type(Ref{Ref{Int}}) ==
+        [
+                (Int64, 2),
+                (Ref{Int64}, 1),
+                (Ref{Ref{Int64}}, 0)
+        ]
 end

@@ -94,13 +94,15 @@ show_comma_sep(xs::Vector) = join(xs, ",")
 
 # Note on "mutable": stats are only mutable during their calculation.
 @kwdef mutable struct InTypeStats
-    pack   :: String
-    modl   :: String
-    occurs :: Int
+    pack   :: String # package we were processing when saw this type
+    modl   :: String # module this type comes from (as reported by repeated calls
+                     # to parentmodule while it gets to a root module)
+    occurs :: Int    # number of times we saw the type
+    depth :: Int     # deepest level under parametric constructors that we saw this type at
 end
 
-InTypeStats(pack :: String, modl :: Module) = InTypeStats(pack, "$modl", 0)
-InTypeStats(pack :: String, modl :: String) = InTypeStats(pack, modl, 0)
+InTypeStats(pack :: String, modl :: Module) = InTypeStats(pack, "$modl", 0, 0)
+InTypeStats(pack :: String, modl :: String) = InTypeStats(pack, modl, 0, 0)
 
 @deriveEq(InTypeStats)
 
@@ -141,18 +143,19 @@ end
 # ----------------------------------------------------------
 
 #
-# module_stats :: (Module, IO) -> ModuleStats
+# module_stats :: (Module, IO, String) -> ModuleStats
 #
-# Given a module object compute stabilty stats for this module.
+# Given a module object compute stabilty stats for this module. Print possible errors
+# to the given IO stream. Record the number of generic types in the given working dir.
 #
 # Assumption:
-#   All code of interest from the module has been compiled. In plain terms, you need to call a method
-#   at least once to have some data about it.
+#   All code of interest from the module has been compiled. In plain terms, you need
+#   to call a method at least once to have some data about it.
 #
 # Normally, you would have a package X exporting main module also called X.
 # You run a test suite of the corresponding package and then call `module_stats(X)`.
 #
-module_stats(modl :: Module, errio :: IO = stderr) = begin
+module_stats(modl :: Module, errio :: IO = stderr, workdir :: String = ".") = begin
     res = ModuleStats(modl)
     mis = all_mis_of_module(modl)
     generic_types = 0
@@ -207,12 +210,16 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             # Step 3: Collect intypes
             intypes = call[2]
             for ty in intypes
-                ty isa UnionAll && (generic_types += 1; continue)
-                tymodl = moduleChainOfType(ty)
-                tystat = get!(res.tystats,
-                            ty,
-                            InTypeStats("$modl", tymodl))
-                tystat.occurs += 1
+                tys = slice_parametric_type(ty)
+                isnothing(tys) && (@info "Generic type $ty"; generic_types += 1; continue)
+                for (ty1, depth) in tys
+                    tymodl = moduleChainOfType(ty1)
+                    tystat = get!(res.tystats,
+                                ty1,
+                                InTypeStats("$modl", tymodl))
+                    tystat.occurs += 1
+                    tystat.depth = max(tystat.depth, depth)
+                end
             end
         catch err
             mest.fail += 1
@@ -221,6 +228,6 @@ module_stats(modl :: Module, errio :: IO = stderr) = begin
             println(errio)
         end
     end
-    open(f->write(f,generic_types), "generic-types-count.txt", "w")
+    open(f->println(f,generic_types), joinpath(workdir, "generic-types-count.txt"), "w")
     res
 end

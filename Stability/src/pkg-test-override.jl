@@ -41,7 +41,7 @@ function Pkg.Operations.gen_test_code(testfile::String;
         @info "[Stability] [Package: " * pakg * "] About to start analysis"
         m = eval(Symbol(pakg)) # typeof(m) is Module
         open(joinpath(wdir, "stability-errors.out"), "w") do err
-          ms = module_stats(m, err)
+          ms = module_stats(m, err, wdir)
           @info "[Stability] [Package: " * pakg * "] Computed module stats"
 
           summary = modstats_summary(ms)
@@ -49,7 +49,7 @@ function Pkg.Operations.gen_test_code(testfile::String;
           open(out -> println(out, pakg * "," * show_comma_sep(summary)), joinpath(wdir, "stability-summary.out"), "w")
 
           @info "[Stability] [Package: " * pakg * "] Constructing a table from the stats..."
-          (methst, mist, tyt) = modstats_table(ms)
+          (methst, mist, tyst) = modstats_table(ms)
 
           @info "[Stability] [Package: " * pakg * "] Table size (per method): " * string(length(methst))
           outf = joinpath(wdir, "stability-stats-per-method.txt")
@@ -61,10 +61,10 @@ function Pkg.Operations.gen_test_code(testfile::String;
           @info "[Stability] [Package: " * pakg * "] About to store per instance results to: " * outf
           open(f-> println(f,mist), outf,"w")
 
-          @info "[Stability] [Package: " * pakg * "] Table size (types): " * string(length(tyt))
+          @info "[Stability] [Package: " * pakg * "] Table size (types): " * string(length(tyst))
           outf = joinpath(wdir, "stability-stats-intypes.txt")
           @info "[Stability] [Package: " * pakg * "] About to store intypes to: " * outf
-          open(f-> println(f,tyt), outf,"w")
+          open(f-> println(f,tyst), outf,"w")
         end
         @info "[Stability] [Package: " * pakg * "] Finish testing + analysis"
         #### End

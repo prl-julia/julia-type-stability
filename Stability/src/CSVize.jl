@@ -34,6 +34,7 @@ struct ModuleStatsInTypeRecord
     modl     :: String
     tyname   :: String
     occurs   :: Int
+    depth    :: Int
 end
 
 #
@@ -105,7 +106,7 @@ modstats_table(ms :: ModuleStats, errio = stdout :: IO) ::
                 modl = "$(tystat.modl)"
                 tyname = "$(ty)"
                 push!(resty,
-                      ModuleStatsInTypeRecord(pack, modl, tyname, tystat.occurs))
+                      ModuleStatsInTypeRecord(pack, modl, tyname, tystat.occurs, tystat.depth))
             catch err
                 println(errio, "ERROR: modstats_table: ty-loop: $err");
                 throw(err)

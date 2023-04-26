@@ -62,3 +62,62 @@ moduleChainOfType(@nospecialize(ty)) :: String = begin
     end
     res
 end
+
+#
+# sequence_nothing : (v :: Vector{Union{T, Nothing}}) -> Union{Nothing, Vector{T}}
+#
+# traverse_nothing looks into the given vetor and if it sees nothing, returns nothing,
+# otherwise it returns the input vector.
+#
+# traverse_nothing([1,nothing,2]) |-> nothing
+# traverse_nothing([1,2]) |-> [1,2]
+#
+sequence_nothing(v :: Vector) :: Union{Nothing, Vector} = begin
+    any(isnothing, v) && return nothing
+    v
+end
+
+
+#
+# slice_parametric_type: (ty, depth :: Int) -> Union{
+#                                                Vector{Tuple{Any, Int}},
+#                                                Nothing}
+#
+# Slice a type constructor into pieces, record the depth of nestedness of every piece.
+#
+# Example: Vector{Vector{Int}} |-> [(Vector{Vector{Int}}, 0), (Vector{Int}, 1), (Int, 2)]
+#
+# If we see existentials anywhere in the type, we return nothing because we're unsure how
+# to deal with variables (a naive approach would yield pieces with unbound variables).
+#
+slice_parametric_type(@nospecialize(ty), depth :: Int = 0) :: Union{Vector{Tuple{Any, Int}}, Nothing} = begin
+
+    ####### Special cases:
+    #
+    # - Unions
+    ty == Union{} && return [] # empty union
+    typeof(ty) == Union &&     # binary union
+        return sequence_nothing(vcat(slice_parametric_type(ty.a, depth+1),
+                    slice_parametric_type(ty.b, depth+1)))
+
+    # - Varargs
+    typeof(ty) == Core.TypeofVararg && return sequence_nothing(slice_parametric_type(ty.T, depth+1))
+
+    # - Most likely values, or something weird with no field `parameters`
+    hasproperty(ty, :parameters) || return []
+
+    # - Existentials (UnionAll): we explicitly discqualify types that have existentials for now
+    typeof(ty) == UnionAll && return nothing
+
+    ####### Normal stuff: atoms and parametric constructors
+    #
+    params = ty.parameters
+
+    # - Non-parametric atomic type
+    isempty(params) && return [(ty, depth)]
+
+    # - parametric
+    rec = map(ty1 -> slice_parametric_type(ty1, depth+1), params)
+    recFlat = reduce(vcat, rec)
+    sequence_nothing(push!(recFlat, (ty, depth)))
+end
