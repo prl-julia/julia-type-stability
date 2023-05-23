@@ -35,7 +35,7 @@ end
 # * f: function
 # * t: tuple of argument types
 # Returns: pair (CodeInstance - typed IR, Inferred Type of the Body)
-function run_type_inference(@nospecialize(f), @nospecialize(t))
+run_type_inference(@nospecialize(f), @nospecialize(t)) = begin
     ct = code_typed(f, t, optimize=false)
     if length(ct) == 0
         throw(TypeInferenceError(f,t)) # type inference failed
@@ -58,7 +58,7 @@ is_grounded_call(src :: CodeInfo) = begin
     slotnames = Base.sourceinfo_slotnames(src)
     for i = 1:length(slottypes)
         stable = is_concrete_type(slottypes[i])
-        @debug "is_stable_call slot:" slotnames[i] slottypes[i] stable
+        @debug "is_grounded_call slot:" slotnames[i] slottypes[i] stable
         result = result && stable
     end
     result
@@ -88,7 +88,8 @@ struct StabilityError <: Exception
     sig :: Any
 end
 
-# reconstruct_func_call : MethodInstance -> IO (Union{ (Method, [Type]), Nothing })
+#
+# reconstruct_func_call : (MethodInstance, workdir: String) -> IO (Union{ (Method, [Type]), Nothing })
 #
 # What does Julia do about (top-level) function calls like `abc(1,xyz)`?
 # 1. Identifiy types of the inputs (1 :: Int, xyz :: Blah)
@@ -100,17 +101,18 @@ end
 # Returns: pair of a method object (2) and a tuple of types of arguments (1)
 #         or nothing if it's constructor call.
 #
-# ### Why IO?
+# ### Why IO and `workdir` parameter?
 # 
-# The analysis here is pure. The only reason we add IO is a sheaky hack we implement
-# to trace suspicous cases of inputs that we don't understand very well. In particular,
-# generic signatures of method instances. In theory they shouldn't appear but in
-# practise they do. So we log then in a file generic-instances.txt
+# The analysis here is pure. The only reason we add IO is for the backdor we use
+# to trace suspicous cases of inputs that we don't understand very well, in particular,
+# generic signatures of method instances. We record those instances (if found) in
+# the file `gfeneric-instansec.txt` in the given workdir. In theory they shouldn't appear,
+# but in practise they do.
 #
-reconstruct_func_call(mi :: MethodInstance) = begin
+reconstruct_func_call(mi :: MethodInstance, workdir :: String) = begin
     unwrp = Base.unwrap_unionall(mi.specTypes)
     unwrp != mi.specTypes && (@warn "Generic method instance found: $mi";
-        run(pipeline(`$mi.specTypes`, stdout="generic-instances.txt")))
+        run(pipeline(`$mi.specTypes`, stdout=joinpath(workdir,"generic-instances.txt"))))
     sig = unwrp.types
     # @show mi.specTypes # -- tuple
     # @show sig          # -- svec

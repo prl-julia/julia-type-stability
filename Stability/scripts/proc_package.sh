@@ -5,6 +5,9 @@
 # - args[0] -- package name
 # - args[1] (optional) -- package version
 #
+# Env vars:
+#  - BATCH=true will put the output to a file rather than on the console
+#
 if [[ $# -eq 0 ]]; then
     echo "Error: missing arguments. Provide package name to process and, optionally, its version."
     exit 1

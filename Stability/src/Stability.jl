@@ -95,7 +95,7 @@ package_stats(pakg :: String, ver = nothing) = begin
         Pkg.test(pakg)
         store_cur_version(pakg)
     catch err
-        println("Error when running tests for package $(pakg)")
+        println("[Stability] Error when running tests for package $(pakg)")
         errio=stderr
         print(errio, "ERROR: ");
         showerror(errio, err, stacktrace(catch_backtrace()))

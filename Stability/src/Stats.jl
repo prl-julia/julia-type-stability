@@ -180,7 +180,7 @@ module_stats(modl :: Module, errio :: IO = stderr, workdir :: String = ".") = be
                                  occursin("Vararg","$(mi.def.sig)")))
         try
             # Get code of the `mi` for later analysis
-            call = reconstruct_func_call(mi)
+            call = reconstruct_func_call(mi, workdir)
             if call === nothing # this mi is a constructor call or it's generic - skip;
                                 # for generics, see a separate file: generic-instances.txt
                 delete!(res.mestats, mi.def)
