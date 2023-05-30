@@ -1,4 +1,6 @@
+@info "Starting merge-types.jl. Using packages..."
 using CSV, DataFrames, Query
+@info "... done."
 
 #
 # Merge stability-stats-intypes.csv table summing up occurs field.
@@ -27,8 +29,11 @@ main() = begin
         end
     end
     resdf = resdf |> @orderby_descending(_.depth) |> DataFrame # we will be loading deepest-nested types first
-    CSV.write("merged-intypes.csv", resdf)
-    print("Done! Bye!")
+
+    outf = "merged-intypes.csv"
+    @info "Storing results in $outf"
+    CSV.write(outf, resdf)
+    @info "Done. Bye!"
 end
 
 main();
