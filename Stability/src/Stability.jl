@@ -90,7 +90,7 @@ package_stats(pakg :: String, ver = nothing) = begin
                             "a version of the package $pakg other than requested. " *
                             "Either remove the Manifest or don't supply the version."))
         end
-        pkgtag = pakg * "@v$iver"
+        iver === nothing || (pkgtag = pakg * "@v$iver")
         @myinfo pkgtag "Added. Now on to testing"
         Pkg.test(pakg)
         store_cur_version(pakg)

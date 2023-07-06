@@ -27,8 +27,10 @@ store_cur_version(pkg::String) = begin
     @info "[Stability] Write down $pkg version to $fname"
 end
 
-# installed_pkg_version :: String ->IO String
+# installed_pkg_version :: String -> IO Union{String, Nothing}
 # Will querry current environment for the version of given package
+# dependency and return its version or Nothing if the package is not
+# in the list of dependencies.
 #
 installed_pkg_version(pkg::String) = begin
     deps = collect(values(Pkg.dependencies()))
